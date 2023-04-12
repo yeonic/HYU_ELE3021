@@ -36,3 +36,5 @@
 #define IRQ_ERROR       19
 #define IRQ_SPURIOUS    31
 
+// lab04-2 user interrupt
+#define T_USERINT     128
