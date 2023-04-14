@@ -12,3 +12,6 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 
+// procq.c
+#define NQLEV        3
+#define QSIZE NPROC+1    // since circular queue needs 1 empty space.

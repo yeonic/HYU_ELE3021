@@ -10,6 +10,7 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  // struct procq mlfq[NQLEV];
 } ptable;
 
 static struct proc *initproc;
