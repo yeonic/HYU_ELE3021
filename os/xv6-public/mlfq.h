@@ -7,3 +7,6 @@ struct levelq{
   uint hstpri;    // highest priority of the levelq. ONLY used when level=2, in case of others, this is set to
 };
 
+struct mlfq{
+  struct levelq levels[NQLEV];
+};

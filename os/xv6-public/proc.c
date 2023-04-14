@@ -12,8 +12,8 @@ struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
+struct mlfq mlfq;
 
-extern struct levelq mlfq[NQLEV]; // mlfq
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -26,6 +26,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  mlfqinit(&mlfq);
 }
 
 // Must be called with interrupts disabled

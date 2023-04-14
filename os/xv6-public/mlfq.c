@@ -7,8 +7,6 @@
 #include "proc.h"
 #include "mlfq.h"
 
-struct levelq mlfq[NQLEV];
-
 // functions for struct procq
 int 
 isempty(struct levelq* q)
@@ -54,16 +52,16 @@ deprocq(struct levelq* q)
   return q->queue[q->front];
 }
 
-// functions for struct mlfq
+// functions for mlfq
 void
-mlfqinit()
+mlfqinit(struct mlfq* curr)
 {
   int i;
   for(i=0; i<NQLEV; i++) {
-    mlfq[i].level = i;
-    mlfq[i].front = 0;
-    mlfq[i].rear = 0;
-    mlfq[i].hstpri = DISABLED;
+    curr->levels[i].level = i;
+    curr->levels[i].front = 0;
+    curr->levels[i].rear = 0;
+    curr->levels[i].hstpri = DISABLED;
   }
-  mlfq[i].hstpri = INITPRI;
+  curr->levels[i].hstpri = INITPRI;
 }
