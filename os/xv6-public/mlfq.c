@@ -54,14 +54,17 @@ deprocq(struct levelq* q)
 
 // functions for mlfq
 void
-mlfqinit(struct mlfq* curr)
+mlfqinit(struct mlfq* tq)
 {
   int i;
   for(i=0; i<NQLEV; i++) {
-    curr->levels[i].level = i;
-    curr->levels[i].front = 0;
-    curr->levels[i].rear = 0;
-    curr->levels[i].hstpri = DISABLED;
+    tq->levels[i].level = i;
+    tq->levels[i].front = 0;
+    tq->levels[i].rear = 0;
+    tq->levels[i].hstpri = DISABLED;
   }
-  curr->levels[i].hstpri = INITPRI;
+  tq->levels[i].hstpri = INITPRI;
 }
+
+void
+mlfqdown(struct mlfq* )
