@@ -7,6 +7,8 @@
 #include "proc.h"
 #include "mlfq.h"
 
+struct levelq mlfq[NQLEV];
+
 // functions for struct procq
 int 
 isempty(struct levelq* q)
@@ -47,8 +49,21 @@ deprocq(struct levelq* q)
 {
   if(isempty(q))
     return (struct proc*)0;
+
   q->front = (q->front+1) % QSIZE;
   return q->queue[q->front];
 }
 
 // functions for struct mlfq
+void
+mlfqinit()
+{
+  int i;
+  for(i=0; i<NQLEV; i++) {
+    mlfq[i].level = i;
+    mlfq[i].front = 0;
+    mlfq[i].rear = 0;
+    mlfq[i].hstpri = DISABLED;
+  }
+  mlfq[i].hstpri = INITPRI;
+}

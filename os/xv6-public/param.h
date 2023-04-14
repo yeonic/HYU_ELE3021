@@ -12,6 +12,8 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 
-// procq.c
+// mlfq.c
 #define NQLEV        3
-#define QSIZE NPROC+1    // since circular queue needs 1 empty space.
+#define QSIZE        NPROC+1    // since circular queue needs 1 empty space.
+#define DISABLED     -123       // when entry of the struct isn't available
+#define INITPRI      99         // initial value for hstpri

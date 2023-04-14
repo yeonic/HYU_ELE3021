@@ -6,13 +6,14 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "mlfq.h"
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  // struct procq mlfq[NQLEV];
 } ptable;
 
+extern struct levelq mlfq[NQLEV]; // mlfq
 static struct proc *initproc;
 
 int nextpid = 1;
