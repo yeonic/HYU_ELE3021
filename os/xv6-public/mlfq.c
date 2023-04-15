@@ -54,6 +54,7 @@ deprocq(struct levelq* q)
 
 // functions for prlevel
 // compare function for priority->queuedtime comparison.
+// fit to while loop.
 int 
 comp(struct proc* a, struct proc* b)
 {
@@ -65,12 +66,12 @@ comp(struct proc* a, struct proc* b)
 }
 
 void 
-swap(struct levelpq* pq, int idx1, int idx2)
+swap(struct proc* h[], int idx1, int idx2)
 {
   struct proc* temp;
-  temp = pq->heap[idx1];
-  pq->heap[idx1] = pq->heap[idx2];
-  pq->heap[idx2] = temp;
+  temp = h[idx1];
+  h[idx1] = h[idx2];
+  h[idx2] = temp;
 }
 
 // put item into priority queue
@@ -84,11 +85,31 @@ enpq(struct levelpq* pq, struct proc* e)
   i = ++pq->size;
   pq->heap[i] = e;
   while(i>1 && comp(pq->heap[i/2], pq->heap[i])){
-    swap(pq, i/2, i);
+    swap(pq->heap, i/2, i);
     i = i/2;
   }
+  return Q_TASK_SUCCEED;
 }
 
+void
+min_heapify(struct levelpq* pq, int curr)
+{
+  int smallest = curr;
+  int left = 2*curr;
+  int right = 2*curr + 1;
+
+  if(left<QSIZE && comp(pq->heap[left], pq->heap[curr])){
+    smallest = left;
+  }
+  if(right<QSIZE && comp(pq->heap[right], pq->heap[curr])){
+    smallest = right;
+  }
+  
+  if(smallest != curr) {
+    swap(pq->heap, curr, smallest);
+    min_heapify(pq, smallest);
+  }
+}
 
 // functions for mlfq
 void
