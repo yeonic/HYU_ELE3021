@@ -7,13 +7,15 @@
 #include "proc.h"
 #include "mlfq.h"
 
+extern int sys_uptime(void);
+
 // functions for struct procq
 int 
 isempty(struct levelq* q)
 {
   if(q->rear == q->front)
-    return 1;
-  return 0;
+    return Q_EMPTY;
+  return Q_TASK_SUCCEED;
 }
 
 int 
@@ -21,22 +23,19 @@ isfull(struct levelq* q)
 {
   if((q->rear)%(NPROC+1) == q->front)
     // max size is NPROC + 1
-    return 1;
-  return 0;
+    return Q_FULL;
+  return Q_TASK_SUCCEED;
 }
 
-
-// return -1 if queue is full.
-// return 0 if enqueue succeed.
 int
 enprocq(struct levelq* q, struct proc* entry)
 {
   if(isfull(q))
-    return -1;
+    return Q_FULL;
   
   q->rear = (q->rear+1) % QSIZE;
   q->queue[q->rear] = entry;
-  return 0;
+  return Q_TASK_SUCCEED;
 }
 
 
@@ -54,17 +53,54 @@ deprocq(struct levelq* q)
 
 // functions for mlfq
 void
-mlfqinit(struct mlfq* tq)
+mlfqinit(struct mlfq* q)
 {
   int i;
   for(i=0; i<NQLEV; i++) {
-    tq->levels[i].level = i;
-    tq->levels[i].front = 0;
-    tq->levels[i].rear = 0;
-    tq->levels[i].hstpri = DISABLED;
+    q->levels[i].level = i;
+    q->levels[i].front = 0;
+    q->levels[i].rear = 0;
+    q->levels[i].hstpri = DISABLED;
   }
-  tq->levels[i].hstpri = INITPRI;
+  q->levels[i].hstpri = INITPRI;
 }
 
-void
-mlfqdown(struct mlfq* )
+int
+enmlfq(struct mlfq* q, struct proc* entry)
+{
+  int clevel = entry->mlfq.level;
+  int rmtime = entry->mlfq.rmtime;
+
+  // when remaining time(rmtime) goes 0
+  // enqueue process into new level.
+  if(rmtime==0 && clevel==2) {
+    if(enprocq(&q->levels[clevel], entry) == Q_FULL)
+      return Q_FULL;
+    entry->mlfq.priority--;
+    entry->mlfq.rmtime = 2*clevel + 4;
+    entry->mlfq.queuedtick = sys_uptime();
+    return Q_TASK_SUCCEED;
+  }
+
+  if(rmtime==0 && clevel<2){
+    if(enprocq(&q->levels[clevel+1], entry) == Q_FULL)
+      return Q_FULL;
+    entry->mlfq.level++;
+    entry->mlfq.rmtime = 2*entry->mlfq.level + 4;
+    entry->mlfq.queuedtick = sys_uptime();
+    return Q_TASK_SUCCEED;
+  }
+
+  // usual case
+  if(enprocq(&q->levels[clevel], entry) == Q_FULL)
+    return Q_FULL;
+  entry->mlfq.queuedtick = sys_uptime();
+  
+  return Q_TASK_SUCCEED;
+}
+
+int
+demlfq(struct mlfq* q, struct proc* entry)
+{
+
+}

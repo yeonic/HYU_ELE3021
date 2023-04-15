@@ -10,3 +10,9 @@ struct levelq{
 struct mlfq{
   struct levelq levels[NQLEV];
 };
+
+enum qstate{
+  Q_EMPTY = 0,
+  Q_FULL = 1,
+  Q_TASK_SUCCEED = 2,
+};
