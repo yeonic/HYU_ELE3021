@@ -92,7 +92,7 @@ enpq(struct levelpq* pq, struct proc* e)
 }
 
 void
-min_heapify(struct levelpq* pq, int curr)
+min_heapify(struct levelpq* pq, uint curr)
 {
   int smallest = curr;
   int left = 2*curr;
@@ -108,6 +108,29 @@ min_heapify(struct levelpq* pq, int curr)
   if(smallest != curr) {
     swap(pq->heap, curr, smallest);
     min_heapify(pq, smallest);
+  }
+}
+
+struct proc*
+depq(struct levelpq* pq)
+{
+  if(pq->size == 0)
+    return Q_EMPTY;
+  
+  struct proc* min = pq->heap[1];
+  pq->heap[1] = pq->heap[pq->size];
+
+  min_heapify(pq, 1);
+  return min;
+}
+
+void
+decreasekey(struct levelpq* pq, int idx, uint key)
+{
+  pq->heap[idx] = key;
+  while(idx < 2 && pq->heap[idx/2] < pq->heap[idx]) {
+      swap(pq->heap, idx/2, idx);
+      idx = idx/2;
   }
 }
 

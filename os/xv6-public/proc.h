@@ -55,6 +55,7 @@ struct proc {
     int priority;
     int rmtime;
     int level;
+    int pqindex;              // used only in pq. when the process is in rr queue, this field is set to DISABLED.
   } mlfq;
 };
 
