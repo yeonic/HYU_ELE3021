@@ -86,13 +86,14 @@ enpq(struct levelpq* pq, struct proc* e)
   pq->heap[i] = e;
   while(i>1 && comp(pq->heap[i/2], pq->heap[i])){
     swap(pq->heap, i/2, i);
+    e->mlfq.pqindex = i/2;
     i = i/2;
   }
   return Q_TASK_SUCCEED;
 }
 
 void
-min_heapify(struct levelpq* pq, uint curr)
+minheapify(struct levelpq* pq, uint curr)
 {
   int smallest = curr;
   int left = 2*curr;
@@ -107,7 +108,7 @@ min_heapify(struct levelpq* pq, uint curr)
   
   if(smallest != curr) {
     swap(pq->heap, curr, smallest);
-    min_heapify(pq, smallest);
+    minheapify(pq, smallest);
   }
 }
 
@@ -118,18 +119,20 @@ depq(struct levelpq* pq)
     return Q_EMPTY;
   
   struct proc* min = pq->heap[1];
-  pq->heap[1] = pq->heap[pq->size];
+  pq->heap[1] = pq->heap[pq->size--];
 
-  min_heapify(pq, 1);
+  minheapify(pq, 1);
   return min;
 }
 
 void
-decreasekey(struct levelpq* pq, int idx, uint key)
+decreasekey(struct levelpq* pq, int idx, uint pri)
 {
-  pq->heap[idx] = key;
-  while(idx < 2 && pq->heap[idx/2] < pq->heap[idx]) {
+  struct proc* proc = pq->heap[idx];
+  pq->heap[idx]->mlfq.priority = pri;
+  while(idx < 2 && comp(pq->heap[idx/2], pq->heap[idx])) {
       swap(pq->heap, idx/2, idx);
+      proc->mlfq.pqindex = idx/2;
       idx = idx/2;
   }
 }
@@ -149,45 +152,96 @@ mlfqinit(struct mlfq* q)
   // priority queue level
   q->prlevel.level = 2;
   q->prlevel.size = 0;
-  q->prlevel.heap[0] = DISABLED;
+  q->prlevel.heap[0] = (struct proc*)DISABLED;
 }
 
-int
+
+// only called when mlfq.rmtime == 0
+// move the process e to lowerly prioritized queue.
+void
+updatemlfq(struct mlfq* q, struct proc* e)
+{
+  switch (e->mlfq.level){
+    case 0:
+      e->mlfq.level++;
+      e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
+      enprocq(&q->rrlevels[e->mlfq.level], e);
+      e->mlfq.queuedtick = sys_uptime();
+      break;
+    case 1:
+      e->mlfq.level++;
+      e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
+      enpq(&q->prlevel, e);
+      e->mlfq.queuedtick = sys_uptime();
+      break;
+    case 2:
+      int newpri = e->mlfq.priority == 0 ? 0 : e->mlfq.priority-1; 
+      decreasekey(&q->prlevel, e->mlfq.pqindex, newpri);// setPriority
+      e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
+      enpq(&q->prlevel, e);
+      e->mlfq.queuedtick = sys_uptime();
+      break;
+  }
+}
+
+void
 enmlfq(struct mlfq* q, struct proc* e)
 {
-  int clevel = e->mlfq.level;
-  int rmtime = e->mlfq.rmtime;
-
-  // when remaining time(rmtime) is 0
-  // enqueue process into new level.
-  if(rmtime==0 && clevel==2) {
-    if(enprocq(&q->rrlevels[clevel], e) == Q_FULL)
-      return Q_FULL;
-    e->mlfq.priority--;
-    e->mlfq.rmtime = 2*clevel + 4;
-    e->mlfq.queuedtick = sys_uptime();
-    return Q_TASK_SUCCEED;
+  // case of proc timeout
+  if(e->mlfq.rmtime == 0) {
+    updatemlfq(q, e);
+    return;
   }
-
-  if(rmtime==0 && clevel<2){
-    if(enprocq(&q->rrlevels[clevel+1], e) == Q_FULL)
-      return Q_FULL;
-    e->mlfq.level++;
-    e->mlfq.rmtime = 2*e->mlfq.level + 4;
-    e->mlfq.queuedtick = sys_uptime();
-    return Q_TASK_SUCCEED;
+  if(e->mlfq.level == 2) {
+    enpq(&q->prlevel, e);
+  } else {
+    enprocq(&q->rrlevels[e->mlfq.level], e);
   }
-
-  // usual case
-  if(enprocq(&q->rrlevels[clevel], e) == Q_FULL)
-    return Q_FULL;
   e->mlfq.queuedtick = sys_uptime();
-
-  return Q_TASK_SUCCEED;
 }
 
-int
-demlfq(struct mlfq* q, struct proc* e)
-{
 
+struct proc*
+demlfq(struct mlfq* q, int level)
+{
+  struct proc* this;
+  if(level == 2) {
+    this = depq(&q->prlevel);
+  } else {
+    this = deprocq(&q->rrlevels[level]);
+  }
+  this->mlfq.rmtime--;
+  return this;
+}
+
+
+// should be called only when ticks == 0
+void
+boostmlfq(struct mlfq* q, int* ticks)
+{
+  struct proc* temp;
+  // reset ( rmtime ) of proc in L0
+  while((temp = deprocq(&q->rrlevels[0])) != 0){
+    temp->mlfq.rmtime = 2*(temp->mlfq.level) + 4;
+    enprocq(&q->rrlevels[0], temp);
+  }
+
+  // reset ( rmtime ) of proc in L1 and enqueue to L0
+  while((temp = deprocq(&q->rrlevels[1])) != 0){
+    temp->mlfq.level = 0;
+    temp->mlfq.rmtime = 2*(temp->mlfq.level) + 4;
+    enprocq(&q->rrlevels[0], temp);
+  }
+
+  // reset ( rmtime, priority ) of proc in L2 and enqueue to L0
+  while((temp=depq(&q->prlevel)) != Q_EMPTY){
+    temp->mlfq.level = 0;
+    temp->mlfq.rmtime = 2*(temp->mlfq.level) + 4;
+    enprocq(&q->rrlevels[0], temp);
+  }
+
+  // reset tick to 0
+  acquire(&tickslock);
+  *ticks = 0;
+  release(&tickslock);
 }

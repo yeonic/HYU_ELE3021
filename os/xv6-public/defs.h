@@ -10,6 +10,10 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+struct levelq;
+struct levelpq;
+struct mlfq;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -185,6 +189,23 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+
+// mlfq.c
+int             isempty(struct levelq* q);
+int             isfull(struct levelq* q);
+int             enprocq(struct levelq* q, struct proc* e);
+struct proc*    deprocq(struct levelq* q);
+int             comp(struct proc* a, struct proc* b);
+void            swap(struct proc* h[], int idx1, int idx2);
+int             enpq(struct levelpq* pq, struct proc* e);
+void            minheapify(struct levelpq* pq, uint curr);
+struct proc*    depq(struct levelpq* pq);
+void            decreasekey(struct levelpq* pq, int idx, uint pri);
+void            mlfqinit(struct mlfq* q);
+void            updatemlfq(struct mlfq* q, struct proc* e);
+void            enmlfq(struct mlfq* q, struct proc* e);
+struct proc*    demlfq(struct mlfq* q, int level);
+void            boostmlfq(struct mlfq* q, int* ticks);
 
 // prac_syscall.c
 int             myfunction(char*);
