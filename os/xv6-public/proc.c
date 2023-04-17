@@ -4,6 +4,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
+#include "trap.c"
 #include "proc.h"
 #include "spinlock.h"
 #include "mlfq.h"
@@ -20,6 +21,7 @@ static struct proc *initproc;
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
+extern uint ticks;
 
 static void wakeup1(void *chan);
 
@@ -323,6 +325,41 @@ wait(void)
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+void schedulerlock(int password) {
+  struct proc* curproc = myproc();
+
+  acquire(&mmlfq.mlfqlock);
+  if(password != 2018008104 ||
+     curproc->state != RUNNABLE || mmlfq.locked == 1) {
+    release(&mmlfq.mlfqlock);
+    kill(curproc->pid);
+    return;
+  }
+  mmlfq.locked = 1;
+  release(&mmlfq.mlfqlock);
+
+  // set mlfq.monopolize field to 1
+  // to recognize if the process is monopolizing the scheduler.
+  curproc->mlfq.monopolize = 1;
+
+  // set global ticks to 0 without p boosting
+  acquire(&tickslock);
+  ticks = 0;
+  release(&tickslock);
+}
+
+void schedulerunlock(int password) {
+  struct proc* curproc = myproc();
+
+  // the process which knows password
+  // and monopolizes
+  if(password != 2018008104 || 
+     curproc->mlfq.monopolize != 1) {
+    kill(curproc->pid);
+    return;
   }
 }
 

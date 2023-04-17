@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "x86.h"
 #include "proc.h"
+#include "spinlock.h"
 #include "mlfq.h"
 
 extern int sys_uptime(void);
@@ -152,6 +153,13 @@ mlfqinit(struct mlfq* q)
   // priority queue level
   q->prlevel.size = 0;
   q->prlevel.heap[0] = (struct proc*)DISABLED;
+
+  // lockflag is set to 1 when schedulerLock is called successfully.
+  // initlock to slock
+  initlock(&q->mlfqlock, "schedlock");
+  acquire(&q->mlfqlock);
+  q->locked = 0;
+  release(&q->mlfqlock);
 }
 
 

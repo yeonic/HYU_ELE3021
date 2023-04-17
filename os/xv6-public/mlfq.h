@@ -13,6 +13,8 @@ struct levelpq{
 struct mlfq{
   struct levelq rrlevels[NQLEV];
   struct levelpq prlevel;
+  struct spinlock mlfqlock;
+  int locked;
 };
 
 enum qstate{

@@ -51,6 +51,7 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct {
+    int monopolize;
     int queuedtick;
     int priority;
     int rmtime;
