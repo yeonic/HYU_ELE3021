@@ -205,7 +205,7 @@ void            mlfqinit(struct mlfq* q);
 void            updatemlfq(struct mlfq* q, struct proc* e);
 void            enmlfq(struct mlfq* q, struct proc* e);
 struct proc*    demlfq(struct mlfq* q, int level);
-void            boostmlfq(struct mlfq* q, int* ticks);
+void            boostmlfq(struct mlfq* q, uint* ticks);
 
 // prac_syscall.c
 int             myfunction(char*);

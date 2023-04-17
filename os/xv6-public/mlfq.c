@@ -221,8 +221,9 @@ demlfq(struct mlfq* q, int level)
 
 // should be called only when ticks == 100
 void
-boostmlfq(struct mlfq* q, int* ticks)
+boostmlfq(struct mlfq* q, uint* ticks)
 {
+  release(&tickslock);
   struct proc* temp;
   // reset ( rmtime ) of proc in L0
   while((temp = deprocq(q->rrlevels, 0)) != 0){
@@ -247,5 +248,4 @@ boostmlfq(struct mlfq* q, int* ticks)
   // reset tick to 0
   acquire(&tickslock);
   *ticks = 0;
-  release(&tickslock);
 }

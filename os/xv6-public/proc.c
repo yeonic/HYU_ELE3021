@@ -343,7 +343,6 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
-    // cprintf("scheduler in.\n");
     // Enable interrupts on this processor.
     sti();
     
@@ -356,6 +355,9 @@ scheduler(void)
       }
       level++;
     }
+
+    // when all the level of the mlfq is empty
+    // continue the scheduler.
     if(level == 2 && mmlfq.prlevel.size == 0) {
       release(&ptable.lock);
       continue;
@@ -391,7 +393,6 @@ scheduler(void)
 void
 sched(void)
 {
-  // cprintf("sched called.\n");
   int intena;
   struct proc *p = myproc();
 

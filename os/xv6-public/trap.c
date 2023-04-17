@@ -13,6 +13,7 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
+extern struct mlfq mmlfq;
 
 void
 tvinit(void)
@@ -112,6 +113,15 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
     yield();
+
+  // when ticks goes 100
+  // priority boosting occurs
+  acquire(&tickslock);
+  if(ticks==100 && tf->trapno == T_IRQ0+IRQ_TIMER) {
+    boostmlfq(&mmlfq, &ticks);
+  }
+  release(&tickslock);
+
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
