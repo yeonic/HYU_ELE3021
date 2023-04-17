@@ -12,7 +12,8 @@ struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
-struct mlfq mlfq;
+
+struct mlfq mmlfq;
 
 static struct proc *initproc;
 
@@ -26,7 +27,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
-  mlfqinit(&mlfq);
+  mlfqinit(&mmlfq);
 }
 
 // Must be called with interrupts disabled
@@ -152,6 +153,11 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  p->mlfq.level = 0;
+  p->mlfq.priority = 3;
+  p->mlfq.rmtime = 2*(p->mlfq.level) + 4;
+  p->mlfq.pqindex = DISABLED;
+  enmlfq(&mmlfq, p);
 
   release(&ptable.lock);
 }
@@ -183,6 +189,7 @@ growproc(int n)
 int
 fork(void)
 {
+  // cprintf("fork called.\n");
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
@@ -218,6 +225,11 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  np->mlfq.level = 0;
+  np->mlfq.priority = 3;
+  np->mlfq.rmtime = 2*(np->mlfq.level) + 4;
+  np->mlfq.pqindex = DISABLED;
+  enmlfq(&mmlfq, np);
 
   release(&ptable.lock);
 
@@ -327,34 +339,45 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  int level;
   c->proc = 0;
   
   for(;;){
+    // cprintf("scheduler in.\n");
     // Enable interrupts on this processor.
     sti();
-
-    // Loop over process table looking for process to run.
+    
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    // Iterate queue L0 ~ L2 to find non-empty queue.
+    level = 0;
+    while(level < 2) {
+      if(isempty(mmlfq.rrlevels, level) != Q_EMPTY) {
+        break;
+      }
+      level++;
     }
-    release(&ptable.lock);
+    if(level == 2 && mmlfq.prlevel.size == 0) {
+      release(&ptable.lock);
+      continue;
+    }
 
+    // update p to chosen proc from mlfq.
+    p = demlfq(&mmlfq, level);
+
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 
@@ -368,6 +391,7 @@ scheduler(void)
 void
 sched(void)
 {
+  // cprintf("sched called.\n");
   int intena;
   struct proc *p = myproc();
 
@@ -390,6 +414,8 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  // cprintf("proc(L%d) set to RUNNABLE.\n", myproc()->mlfq.level);
+  enmlfq(&mmlfq, myproc());  // put myproc to mlfq.
   sched();
   release(&ptable.lock);
 }
@@ -463,8 +489,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
+      enmlfq(&mmlfq, p);   // put woke-up-process to mlfq.
+    }
 }
 
 // Wake up all processes sleeping on chan.

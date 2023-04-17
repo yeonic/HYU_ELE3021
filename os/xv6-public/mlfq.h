@@ -3,12 +3,10 @@ struct levelq{
   struct proc* queue[QSIZE]; 
   int front;
   int rear;
-  int level;
 };
 
 struct levelpq{
   struct proc* heap[QSIZE];
-  int level;
   int size;
 };
 

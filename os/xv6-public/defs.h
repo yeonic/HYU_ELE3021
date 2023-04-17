@@ -191,10 +191,10 @@ int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
 // mlfq.c
-int             isempty(struct levelq* q);
-int             isfull(struct levelq* q);
-int             enprocq(struct levelq* q, struct proc* e);
-struct proc*    deprocq(struct levelq* q);
+int             isempty(struct levelq* q, int level);
+int             isfull(struct levelq* q, int level);
+void             enprocq(struct levelq* q, int level, struct proc* e);
+struct proc*    deprocq(struct levelq* q, int level);
 int             comp(struct proc* a, struct proc* b);
 void            swap(struct proc* h[], int idx1, int idx2);
 int             enpq(struct levelpq* pq, struct proc* e);
