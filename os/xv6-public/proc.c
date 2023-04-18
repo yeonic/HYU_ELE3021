@@ -70,6 +70,31 @@ myproc(void) {
   return p;
 }
 
+
+// returns level of current process
+int 
+getLevel(void)
+{
+  return myproc()->mlfq.level;
+}
+
+void
+setPriority(int pid, int priority)
+{
+  struct proc* p;
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->pid == pid) {
+      p->mlfq.priority = priority;
+      break;
+    }
+  }
+  release(&ptable.lock);
+
+  if(p->mlfq.level == 2)
+    minheapify(&mmlfq.prlevel, 1);
+}
+
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
@@ -154,6 +179,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  p->mlfq.monopolize = -1;
   p->mlfq.level = 0;
   p->mlfq.priority = 3;
   p->mlfq.rmtime = 2*(p->mlfq.level) + 4;
@@ -226,6 +252,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  np->mlfq.monopolize = -1;
   np->mlfq.level = 0;
   np->mlfq.priority = 3;
   np->mlfq.rmtime = 2*(np->mlfq.level) + 4;
@@ -342,9 +369,9 @@ schedulerLock(int password)
   mmlfq.locked = 1;
   release(&mmlfq.mlfqlock);
 
-  // set mlfq.monopolize field to 1
-  // to recognize if the process is monopolizing the scheduler.
-  curproc->mlfq.monopolize = 1;
+  // set mlfq.monopolize field to 0
+  // when mlfq.monopolize goes 100, schedulerUnlock
+  curproc->mlfq.monopolize = 0;
 
   // set global ticks to 0 without p boosting
   acquire(&tickslock);
@@ -371,7 +398,7 @@ schedulerUnlock(int password)
   mmlfq.locked = 0;
   release(&mmlfq.mlfqlock);
 
-  curproc->mlfq.monopolize = 0;
+  curproc->mlfq.monopolize = -1;
   curproc->mlfq.priority = 3;
   curproc->mlfq.level = 0;
   curproc->mlfq.rmtime = 2*(curproc->mlfq.level) + 4;
@@ -404,9 +431,10 @@ scheduler(void)
     if(mmlfq.locked) {
       acquire(&ptable.lock);
       for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        if(p->state == RUNNABLE && p->mlfq.monopolize){
+        if(p->state == RUNNABLE && p->mlfq.monopolize > 0){
           release(&ptable.lock);
           release(&mmlfq.mlfqlock);
+          p->mlfq.monopolize++;
           goto swtchcontxt;
         }
       }

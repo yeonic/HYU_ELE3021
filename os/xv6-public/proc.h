@@ -51,7 +51,7 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct {
-    int monopolize;
+    int monopolize;            // initialize to -1, set to 0 when schedulerLock is called
     int queuedtick;
     int priority;
     int rmtime;

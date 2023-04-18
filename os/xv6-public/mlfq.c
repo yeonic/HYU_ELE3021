@@ -197,6 +197,7 @@ updatemlfq(struct mlfq* q, struct proc* e)
       e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
       enpq(&q->prlevel, e);
       e->mlfq.queuedtick = sys_uptime();
+      minheapify(&q->prlevel, 1);
       break;
     case 2:
       int newpri = e->mlfq.priority == 0 ? 0 : e->mlfq.priority-1;

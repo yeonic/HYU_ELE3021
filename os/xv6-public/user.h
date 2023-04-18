@@ -26,6 +26,9 @@ int uptime(void);
 int myfunction(char*);
 void schedulerLock(int);
 void schedulerUnlock(int);
+void yield(void);
+int getLevel(void);
+void setPriority(int, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

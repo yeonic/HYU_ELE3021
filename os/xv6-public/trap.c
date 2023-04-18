@@ -122,6 +122,14 @@ trap(struct trapframe *tf)
   }
   release(&tickslock);
 
+  acquire(&tickslock);
+  if(ticks==100 && 
+    myproc() && myproc()->mlfq.monopolize == 100 &&
+    tf->trapno == T_IRQ0+IRQ_TIMER) {
+    schedulerUnlock(2018008104);
+  }
+  release(&tickslock);
+
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
