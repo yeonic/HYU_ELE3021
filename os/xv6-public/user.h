@@ -24,6 +24,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int myfunction(char*);
+void schedulerLock(int);
+void schedulerUnlock(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

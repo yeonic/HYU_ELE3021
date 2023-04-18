@@ -327,7 +327,9 @@ wait(void)
   }
 }
 
-void schedulerlock(int password) {
+void 
+schedulerLock(int password)
+{
   struct proc* curproc = myproc();
 
   acquire(&mmlfq.mlfqlock);
@@ -350,7 +352,9 @@ void schedulerlock(int password) {
   release(&tickslock);
 }
 
-void schedulerunlock(int password) {
+void 
+schedulerUnlock(int password) 
+{
   struct proc* curproc = myproc();
 
   // the process which knows password and monopolizes
