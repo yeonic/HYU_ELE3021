@@ -4,7 +4,6 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
-#include "trap.c"
 #include "proc.h"
 #include "spinlock.h"
 #include "mlfq.h"
@@ -333,7 +332,7 @@ void schedulerlock(int password) {
 
   acquire(&mmlfq.mlfqlock);
   if(password != 2018008104 ||
-     curproc->state != RUNNABLE || mmlfq.locked == 1) {
+     curproc->state != RUNNABLE || mmlfq.locked != 1) {
     release(&mmlfq.mlfqlock);
     kill(curproc->pid);
     return;
@@ -354,13 +353,25 @@ void schedulerlock(int password) {
 void schedulerunlock(int password) {
   struct proc* curproc = myproc();
 
-  // the process which knows password
-  // and monopolizes
+  // the process which knows password and monopolizes
+  // can run this function
+  acquire(&mmlfq.mlfqlock);
   if(password != 2018008104 || 
-     curproc->mlfq.monopolize != 1) {
+     mmlfq.locked != 1 ||
+     curproc->mlfq.monopolize != 1 ||
+     curproc->state != RUNNABLE) {
+    release(&mmlfq.mlfqlock);
     kill(curproc->pid);
     return;
   }
+  mmlfq.locked = 0;
+  release(&mmlfq.mlfqlock);
+
+  curproc->mlfq.monopolize = 0;
+  curproc->mlfq.priority = 3;
+  curproc->mlfq.level = 0;
+  curproc->mlfq.rmtime = 2*(curproc->mlfq.level) + 4;
+  fenprocq(mmlfq.rrlevels, curproc);
 }
 
 //PAGEBREAK: 42
@@ -382,8 +393,22 @@ scheduler(void)
   for(;;){
     // Enable interrupts on this processor.
     sti();
-    
-    acquire(&ptable.lock);
+
+    // check if there is monopolizing process
+    // if it is, skip the rest scheduling policy.
+    acquire(&mmlfq.mlfqlock);
+    if(mmlfq.locked) {
+      acquire(&ptable.lock);
+      for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if(p->state == RUNNABLE && p->mlfq.monopolize){
+          release(&ptable.lock);
+          release(&mmlfq.mlfqlock);
+          goto swtchcontxt;
+        }
+      }
+    }
+    release(&mmlfq.mlfqlock);
+
     // Iterate queue L0 ~ L2 to find non-empty queue.
     level = 0;
     while(level < 2) {
@@ -396,16 +421,18 @@ scheduler(void)
     // when all the level of the mlfq is empty
     // continue the scheduler.
     if(level == 2 && mmlfq.prlevel.size == 0) {
-      release(&ptable.lock);
       continue;
     }
 
     // update p to chosen proc from mlfq.
     p = demlfq(&mmlfq, level);
+    goto swtchcontxt;
 
+  swtchcontxt:
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
+    acquire(&ptable.lock);
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;

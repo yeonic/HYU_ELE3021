@@ -5,6 +5,10 @@
     "param.h": "c",
     "defs.h": "c",
     "memlayout.h": "c",
-    "mmu.h": "c"
+    "mmu.h": "c",
+    "spinlock.h": "c",
+    "proc.h": "c",
+    "mlfq.h": "c",
+    "x86.h": "c"
   }
 }

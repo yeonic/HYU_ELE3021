@@ -38,6 +38,22 @@ enprocq(struct levelq* q, int level, struct proc* e)
   q[level].queue[q[level].rear] = e;
 }
 
+// enqueue to front of the L0 queue.
+// only used in schedulerunlock.
+void
+fenprocq(struct levelq* q, struct proc* e)
+{
+  if(isempty(q, 0) == Q_EMPTY)
+    return enprocq(q, 0, e);
+
+  // it is make sense that least prioritized process need to be kicked.
+  if(isfull(q, 0) == Q_FULL) {
+    q[0].rear = q[0].rear == 0 ? QSIZE-1 : q[0].rear - 1;
+  }
+  q[0].front = q[0].front == 0 ? QSIZE-1 : q[0].front - 1;
+  q[0].queue[q[0].front] = e;  
+}
+
 
 // return null if queue is empty
 // return proc* if dequeue succeed
