@@ -142,6 +142,7 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  cprintf("end of allocproc(pid%d)\n", p->pid);
   return p;
 }
 
@@ -225,7 +226,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
+  cprintf("here?\n");
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
@@ -249,17 +250,19 @@ fork(void)
 
   pid = np->pid;
 
-  acquire(&ptable.lock);
-
-  np->state = RUNNABLE;
   np->mlfq.monopolize = -1;
   np->mlfq.level = 0;
   np->mlfq.priority = 3;
   np->mlfq.rmtime = 2*(np->mlfq.level) + 4;
   np->mlfq.pqindex = DISABLED;
-  enmlfq(&mmlfq, np);
 
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
   release(&ptable.lock);
+
+
+  enmlfq(&mmlfq, np);
+  cprintf("np(L%d): pid(%d) queued in %d\n", np->mlfq.level, np->pid, np->mlfq.queuedtick);
 
   return pid;
 }
@@ -433,11 +436,12 @@ scheduler(void)
       for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if(p->state == RUNNABLE && p->mlfq.monopolize > 0){
           release(&ptable.lock);
-          release(&mmlfq.mlfqlock);
           p->mlfq.monopolize++;
+          release(&mmlfq.mlfqlock);
           goto swtchcontxt;
         }
       }
+      release(&ptable.lock);
     }
     release(&mmlfq.mlfqlock);
 
@@ -458,6 +462,7 @@ scheduler(void)
 
     // update p to chosen proc from mlfq.
     p = demlfq(&mmlfq, level);
+    // cprintf("proc(pid%d, L%d) dequeued(rmt: %d).\n", p->pid, p->mlfq.level, p->mlfq.rmtime);
     goto swtchcontxt;
 
   swtchcontxt:
@@ -511,7 +516,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
-  // cprintf("proc(L%d) set to RUNNABLE.\n", myproc()->mlfq.level);
+  // cprintf("proc(pid%d, L%d) set to RUNNABLE(rmt: %d).\n", myproc()->pid, myproc()->mlfq.level, myproc()->mlfq.rmtime);
   enmlfq(&mmlfq, myproc());  // put myproc to mlfq.
   sched();
   release(&ptable.lock);

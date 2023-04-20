@@ -184,7 +184,6 @@ mlfqinit(struct mlfq* q)
 void
 updatemlfq(struct mlfq* q, struct proc* e)
 {
-  // cprintf("now, in updatemlfq.\n");
   switch (e->mlfq.level){
     case 0:
       e->mlfq.level++;
@@ -212,6 +211,10 @@ updatemlfq(struct mlfq* q, struct proc* e)
 void
 enmlfq(struct mlfq* q, struct proc* e)
 {
+  if(e->state != RUNNABLE) {
+    return;
+  }
+
   // case of proc timeout
   if(e->mlfq.rmtime == 0) {
     updatemlfq(q, e);

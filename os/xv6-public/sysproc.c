@@ -126,7 +126,6 @@ int
 sys_uptime(void)
 {
   uint xticks;
-
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
