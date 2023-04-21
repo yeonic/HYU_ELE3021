@@ -9,6 +9,10 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct levelq;
+struct levelpq;
+struct mlfq;
+
 
 // bio.c
 void            binit(void);
@@ -110,8 +114,12 @@ int             growproc(int);
 int             kill(int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
+int             getLevel(void);
+void            setPriority(int, int);
 void            pinit(void);
 void            procdump(void);
+void            schedulerLock(int);
+void            schedulerUnlock(int);
 void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
 void            setproc(struct proc*);
@@ -185,6 +193,24 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+
+// mlfq.c
+int             isempty(struct levelq*, int);
+int             isfull(struct levelq*, int);
+void            enprocq(struct levelq*, int, struct proc*);
+void            fenprocq(struct levelq*, struct proc*);
+struct proc*    deprocq(struct levelq*, int);
+int             comp(struct proc*, struct proc*);
+void            swap(struct proc*[], int, int);
+int             enpq(struct levelpq*, struct proc*);
+void            minheapify(struct levelpq*, uint);
+struct proc*    depq(struct levelpq*);
+void            decreasekey(struct levelpq*, int, uint);
+void            mlfqinit(struct mlfq*);
+void            updatemlfq(struct mlfq*, struct proc*);
+void            enmlfq(struct mlfq*, struct proc*);
+struct proc*    demlfq(struct mlfq*, int);
+void            boostmlfq(struct mlfq*, uint*);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

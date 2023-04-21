@@ -49,6 +49,15 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  struct {
+    int monopolize;            // initialize to -1, set to 0 when schedulerLock is called
+    int queuedtick;
+    int priority;
+    int rmtime;
+    int level;
+    int pqindex;              // used only in pq. when the process is in rr queue, this field is set to DISABLED.
+  } mlfq;
 };
 
 // Process memory is laid out contiguously, low addresses first:

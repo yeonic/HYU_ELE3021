@@ -6,12 +6,14 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "mlfq.h"
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
 
+struct mlfq mlfq;
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -64,6 +66,30 @@ myproc(void) {
   popcli();
   return p;
 }
+
+int 
+getLevel(void)
+{
+  return myproc()->mlfq.level;
+}
+
+void
+setPriority(int pid, int priority)
+{
+  struct proc* p;
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->pid == pid) {
+      p->mlfq.priority = priority;
+      break;
+    }
+  }
+  release(&ptable.lock);
+
+  if(p->mlfq.level == 2)
+    minheapify(&mlfq.prlevel, 1);
+}
+
 
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
@@ -310,6 +336,52 @@ wait(void)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }
+
+void 
+schedulerLock(int password)
+{
+  struct proc* curproc = myproc();
+
+  if(password != 2018008104 ||
+     curproc->state != RUNNABLE || mlfq.locked != 1) {
+    kill(curproc->pid);
+    return;
+  }
+  mlfq.locked = 1;
+
+  // set mlfq.monopolize field to 0
+  // when mlfq.monopolize goes 100, schedulerUnlock
+  curproc->mlfq.monopolize = 0;
+
+  // set global ticks to 0 without p boosting
+  acquire(&tickslock);
+  ticks = 0;
+  release(&tickslock);
+}
+
+void 
+schedulerUnlock(int password) 
+{
+  struct proc* curproc = myproc();
+
+  // the process which knows password and monopolizes
+  // can run this function
+  if(password != 2018008104 || 
+     mlfq.locked != 1 ||
+     curproc->mlfq.monopolize != 1 ||
+     curproc->state != RUNNABLE) {
+    kill(curproc->pid);
+    return;
+  }
+  mlfq.locked = 0;
+
+  curproc->mlfq.monopolize = -1;
+  curproc->mlfq.priority = 3;
+  curproc->mlfq.level = 0;
+  curproc->mlfq.rmtime = 2*(curproc->mlfq.level) + 4;
+  fenprocq(mlfq.rrlevels, curproc);
+}
+
 
 //PAGEBREAK: 42
 // Per-CPU process scheduler.

@@ -23,6 +23,11 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+void schedulerLock(int);
+void schedulerUnlock(int);
+void yield(void);
+int getLevel(void);
+void setPriority(int, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

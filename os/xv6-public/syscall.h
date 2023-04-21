@@ -20,3 +20,10 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+
+// user defined syscall
+#define SYS_schedulerLock        22
+#define SYS_schedulerUnlock      23
+#define SYS_yield                24
+#define SYS_getLevel             25
+#define SYS_setPriority          26
