@@ -172,10 +172,7 @@ mlfqinit(struct mlfq* q)
 
   // lockflag is set to 1 when schedulerLock is called successfully.
   // initlock to slock
-  initlock(&q->mlfqlock, "schedlock");
-  acquire(&q->mlfqlock);
   q->locked = 0;
-  release(&q->mlfqlock);
 }
 
 
@@ -251,7 +248,6 @@ demlfq(struct mlfq* q, int level)
 void
 boostmlfq(struct mlfq* q, uint* ticks)
 {
-  release(&tickslock);
   struct proc* temp;
   // reset ( rmtime ) of proc in L0
   while((temp = deprocq(q->rrlevels, 0)) != 0){
@@ -274,6 +270,5 @@ boostmlfq(struct mlfq* q, uint* ticks)
   }
 
   // reset tick to 0
-  acquire(&tickslock);
   *ticks = 0;
 }

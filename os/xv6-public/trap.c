@@ -13,7 +13,6 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
-extern struct mlfq mmlfq;
 
 void
 tvinit(void)
@@ -23,10 +22,6 @@ tvinit(void)
   for(i = 0; i < 256; i++)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
-  SETGATE(idt[T_USERINT], 0, SEG_KCODE<<3, vectors[T_USERINT], DPL_USER);
-  SETGATE(idt[T_SCHEDLOCK], 0, SEG_KCODE<<3, vectors[T_SCHEDLOCK], DPL_USER);
-  SETGATE(idt[T_SCHEDUNLOCK], 0, SEG_KCODE<<3, vectors[T_SCHEDUNLOCK], DPL_USER);
-
 
   initlock(&tickslock, "time");
 }
@@ -48,19 +43,6 @@ trap(struct trapframe *tf)
     syscall();
     if(myproc()->killed)
       exit();
-    return;
-  }
-  if(tf->trapno == T_USERINT) {
-    cprintf("user interrupt %d called!\n", tf->trapno);
-    exit();
-    return;
-  }
-  if(tf->trapno == T_SCHEDLOCK) {
-    schedulerLock(2018008104);
-    return;
-  }
-  if(tf->trapno == T_SCHEDLOCK) {
-    schedulerUnlock(2018008104);
     return;
   }
 
@@ -95,7 +77,6 @@ trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
-  
 
   //PAGEBREAK: 13
   default:
@@ -124,23 +105,6 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
     yield();
-
-  // when ticks goes 100
-  // priority boosting occurs
-  acquire(&tickslock);
-  if(ticks==100 && tf->trapno == T_IRQ0+IRQ_TIMER) {
-    boostmlfq(&mmlfq, &ticks);
-  }
-  release(&tickslock);
-
-  acquire(&tickslock);
-  if(ticks==100 && 
-    myproc() && myproc()->mlfq.monopolize == 100 &&
-    tf->trapno == T_IRQ0+IRQ_TIMER) {
-    schedulerUnlock(2018008104);
-  }
-  release(&tickslock);
-
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
