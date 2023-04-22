@@ -124,6 +124,7 @@ void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
 void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
+void            procinit(struct proc*);
 void            userinit(void);
 int             wait(void);
 void            wakeup(void*);

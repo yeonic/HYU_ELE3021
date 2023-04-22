@@ -26,6 +26,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  mlfqinit(&mlfq);    // initialzie mlfq
 }
 
 // Must be called with interrupts disabled
@@ -141,6 +142,14 @@ found:
   return p;
 }
 
+void procinit(struct proc* p) {
+  p->mlfq.level = 0;
+  p->mlfq.priority = 3;
+  p->mlfq.monopolize = DISAMONO;
+  p->mlfq.pqindex = DISABLED;
+  p->mlfq.rmtime = 2*(p->mlfq.level) + 4;
+}
+
 //PAGEBREAK: 32
 // Set up first user process.
 void
@@ -174,7 +183,9 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
+  procinit(p);
   p->state = RUNNABLE;
+  enmlfq(&mlfq, p);
 
   release(&ptable.lock);
 }
@@ -240,7 +251,9 @@ fork(void)
 
   acquire(&ptable.lock);
 
+  procinit(np);
   np->state = RUNNABLE;
+  enmlfq(&mlfq, np);
 
   release(&ptable.lock);
 
@@ -459,6 +472,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  enmlfq(&mlfq, myproc());
   sched();
   release(&ptable.lock);
 }
@@ -532,8 +546,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      enmlfq(&mlfq, p);
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -558,8 +574,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        enmlfq(&mlfq, p);
+      }
       release(&ptable.lock);
       return 0;
     }

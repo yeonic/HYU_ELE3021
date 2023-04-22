@@ -52,7 +52,7 @@ struct proc {
 
   struct {
     int monopolize;            // initialize to -1, set to 0 when schedulerLock is called
-    int queuedtick;
+    int elapsed;
     int priority;
     int rmtime;
     int level;

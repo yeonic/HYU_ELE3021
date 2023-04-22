@@ -14,6 +14,7 @@
 
 #define QSIZE        65
 #define NQLEV        3
-#define TRUE         0
-#define FALSE        1
+#define TRUE         1
+#define FALSE        0
 #define DISABLED     0
+#define DISAMONO     -1
