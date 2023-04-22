@@ -99,6 +99,7 @@ sys_yield(void)
   return 0;
 }
 
+
 int
 sys_sleep(void)
 {
@@ -126,6 +127,7 @@ int
 sys_uptime(void)
 {
   uint xticks;
+
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);

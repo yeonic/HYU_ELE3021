@@ -8,8 +8,6 @@
 #include "spinlock.h"
 #include "mlfq.h"
 
-extern int sys_uptime(void);
-
 // functions for rrlevel
 int 
 isempty(struct levelq* q, int level)
@@ -69,15 +67,16 @@ deprocq(struct levelq* q, int level)
 
 
 // functions for prlevel
-// compare function for priority->queuedtime comparison.
+// compare function for priority->elapsed time comparison.
 // fit to while loop.
+// FALSE -> stop loop.
 int 
-comp(struct proc* a, struct proc* b)
+comp(struct proc* parent, struct proc* child)
 {
-  if(a->mlfq.priority < b->mlfq.priority)
+  if(parent->mlfq.priority < child->mlfq.priority)
     return FALSE;
-  else if(a->mlfq.priority == b->mlfq.priority)
-    return a->mlfq.queuedtick <= b->mlfq.queuedtick ? FALSE : TRUE;
+  else if(parent->mlfq.priority == child->mlfq.priority)
+    return parent->mlfq.elapsed >= child->mlfq.elapsed ? FALSE : TRUE;
   return TRUE;
 }
 
@@ -116,10 +115,10 @@ minheapify(struct levelpq* pq, uint curr)
   int left = 2*curr;
   int right = 2*curr + 1;
 
-  if(left<pq->size && comp(pq->heap[left], pq->heap[curr])){
+  if(left<pq->size && !comp(pq->heap[curr], pq->heap[left])){
     smallest = left;
   }
-  if(right<pq->size && comp(pq->heap[right], pq->heap[curr])){
+  if(right<pq->size && !comp(pq->heap[curr], pq->heap[right])){
     smallest = right;
   }
   
@@ -146,7 +145,7 @@ decreasekey(struct levelpq* pq, int idx, uint pri)
 {
   // cprintf("(pq, idx, pri): (%d, %d, %d)\n", pq, idx, pri);
   struct proc* proc = pq->heap[idx];
-  pq->heap[idx]->mlfq.priority = pri;
+  proc->mlfq.priority = pri;
 
   while(idx > 2 && comp(pq->heap[idx/2], pq->heap[idx])) {
       swap(pq->heap, idx/2, idx);
@@ -172,10 +171,7 @@ mlfqinit(struct mlfq* q)
 
   // lockflag is set to 1 when schedulerLock is called successfully.
   // initlock to slock
-  initlock(&q->mlfqlock, "schedlock");
-  acquire(&q->mlfqlock);
   q->locked = 0;
-  release(&q->mlfqlock);
 }
 
 
@@ -189,21 +185,24 @@ updatemlfq(struct mlfq* q, struct proc* e)
       e->mlfq.level++;
       e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
       enprocq(q->rrlevels, e->mlfq.level, e);
-      e->mlfq.queuedtick = sys_uptime();
+      e->mlfq.elapsed = 0;
       break;
     case 1:
       e->mlfq.level++;
       e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
       enpq(&q->prlevel, e);
-      e->mlfq.queuedtick = sys_uptime();
+      e->mlfq.elapsed = 0;
       minheapify(&q->prlevel, 1);
       break;
     case 2:
-      int newpri = e->mlfq.priority == 0 ? 0 : e->mlfq.priority-1;
-      decreasekey(&q->prlevel, e->mlfq.pqindex, newpri);// setPriority
+      if(e->mlfq.priority != 0) {
+        e->mlfq.priority--;
+        decreasekey(&q->prlevel, e->mlfq.pqindex, e->mlfq.priority);// setPriority
+      }
+
       e->mlfq.rmtime = 2*(e->mlfq.level) + 4;
       enpq(&q->prlevel, e);
-      e->mlfq.queuedtick = sys_uptime();
+      e->mlfq.elapsed = 0;
       break;
   }
 }
@@ -227,7 +226,7 @@ enmlfq(struct mlfq* q, struct proc* e)
     enprocq(q->rrlevels, e->mlfq.level, e);
     // cprintf("enmlfq: pid%d to L%d(%d ticks left.)\n", e->pid, e->mlfq.level, e->mlfq.rmtime);
   }
-  e->mlfq.queuedtick = sys_uptime();
+  e->mlfq.elapsed++;
 }
 
 
@@ -249,9 +248,8 @@ demlfq(struct mlfq* q, int level)
 
 // should be called only when ticks == 100
 void
-boostmlfq(struct mlfq* q, uint* ticks)
+boostmlfq(struct mlfq* q)
 {
-  release(&tickslock);
   struct proc* temp;
   // reset ( rmtime ) of proc in L0
   while((temp = deprocq(q->rrlevels, 0)) != 0){
@@ -272,8 +270,4 @@ boostmlfq(struct mlfq* q, uint* ticks)
     temp->mlfq.rmtime = 2*(temp->mlfq.level) + 4;
     enprocq(q->rrlevels, 0, temp);
   }
-
-  // reset tick to 0
-  acquire(&tickslock);
-  *ticks = 0;
 }

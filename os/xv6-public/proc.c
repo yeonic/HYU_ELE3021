@@ -13,14 +13,12 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
-struct mlfq mmlfq;
-
+struct mlfq mlfq;
 static struct proc *initproc;
 
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
-extern uint ticks;
 
 static void wakeup1(void *chan);
 
@@ -28,7 +26,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
-  mlfqinit(&mmlfq);
+  mlfqinit(&mlfq);    // initialzie mlfq
 }
 
 // Must be called with interrupts disabled
@@ -70,8 +68,6 @@ myproc(void) {
   return p;
 }
 
-
-// returns level of current process
 int 
 getLevel(void)
 {
@@ -92,8 +88,9 @@ setPriority(int pid, int priority)
   release(&ptable.lock);
 
   if(p->mlfq.level == 2)
-    minheapify(&mmlfq.prlevel, 1);
+    minheapify(&mlfq.prlevel, 1);
 }
+
 
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
@@ -142,8 +139,15 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
-  cprintf("end of allocproc(pid%d)\n", p->pid);
   return p;
+}
+
+void procinit(struct proc* p) {
+  p->mlfq.level = 0;
+  p->mlfq.priority = 3;
+  p->mlfq.monopolize = DISAMONO;
+  p->mlfq.pqindex = DISABLED;
+  p->mlfq.rmtime = 2*(p->mlfq.level) + 4;
 }
 
 //PAGEBREAK: 32
@@ -179,13 +183,9 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
+  procinit(p);
   p->state = RUNNABLE;
-  p->mlfq.monopolize = -1;
-  p->mlfq.level = 0;
-  p->mlfq.priority = 3;
-  p->mlfq.rmtime = 2*(p->mlfq.level) + 4;
-  p->mlfq.pqindex = DISABLED;
-  enmlfq(&mmlfq, p);
+  enmlfq(&mlfq, p);
 
   release(&ptable.lock);
 }
@@ -217,7 +217,6 @@ growproc(int n)
 int
 fork(void)
 {
-  // cprintf("fork called.\n");
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
@@ -226,7 +225,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-  cprintf("here?\n");
+
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
@@ -250,19 +249,13 @@ fork(void)
 
   pid = np->pid;
 
-  np->mlfq.monopolize = -1;
-  np->mlfq.level = 0;
-  np->mlfq.priority = 3;
-  np->mlfq.rmtime = 2*(np->mlfq.level) + 4;
-  np->mlfq.pqindex = DISABLED;
-
   acquire(&ptable.lock);
+
+  procinit(np);
   np->state = RUNNABLE;
+  enmlfq(&mlfq, np);
+
   release(&ptable.lock);
-
-
-  enmlfq(&mmlfq, np);
-  cprintf("np(L%d): pid(%d) queued in %d\n", np->mlfq.level, np->pid, np->mlfq.queuedtick);
 
   return pid;
 }
@@ -362,15 +355,16 @@ schedulerLock(int password)
 {
   struct proc* curproc = myproc();
 
-  acquire(&mmlfq.mlfqlock);
-  if(password != 2018008104 ||
-     curproc->state != RUNNABLE || mmlfq.locked != 1) {
-    release(&mmlfq.mlfqlock);
+  if(password != PASSWORD ||
+     curproc->state != RUNNING ||
+     curproc->mlfq.monopolize != -1 || 
+     mlfq.locked != 0) {
     kill(curproc->pid);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
   }
-  mmlfq.locked = 1;
-  release(&mmlfq.mlfqlock);
+  mlfq.locked = 1;
+  curproc->mlfq.level = -1;
 
   // set mlfq.monopolize field to 0
   // when mlfq.monopolize goes 100, schedulerUnlock
@@ -389,24 +383,23 @@ schedulerUnlock(int password)
 
   // the process which knows password and monopolizes
   // can run this function
-  acquire(&mmlfq.mlfqlock);
-  if(password != 2018008104 || 
-     mmlfq.locked != 1 ||
-     curproc->mlfq.monopolize != 1 ||
-     curproc->state != RUNNABLE) {
-    release(&mmlfq.mlfqlock);
+  if(password != PASSWORD || 
+     mlfq.locked != 1 ||
+     curproc->mlfq.level != -1||
+     curproc->state != RUNNING) {
     kill(curproc->pid);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
   }
-  mmlfq.locked = 0;
-  release(&mmlfq.mlfqlock);
+  mlfq.locked = 0;
 
   curproc->mlfq.monopolize = -1;
   curproc->mlfq.priority = 3;
   curproc->mlfq.level = 0;
   curproc->mlfq.rmtime = 2*(curproc->mlfq.level) + 4;
-  fenprocq(mmlfq.rrlevels, curproc);
+  fenprocq(mlfq.rrlevels, curproc);
 }
+
 
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
@@ -419,57 +412,42 @@ schedulerUnlock(int password)
 void
 scheduler(void)
 {
+  int level;
   struct proc *p;
   struct cpu *c = mycpu();
-  int level;
   c->proc = 0;
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
-    // check if there is monopolizing process
-    // if it is, skip the rest scheduling policy.
-    acquire(&mmlfq.mlfqlock);
-    if(mmlfq.locked) {
-      acquire(&ptable.lock);
+    acquire(&ptable.lock);
+    if(mlfq.locked) {
       for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        if(p->state == RUNNABLE && p->mlfq.monopolize > 0){
-          release(&ptable.lock);
+        if(p->state == RUNNABLE && p->mlfq.level == -1) {
           p->mlfq.monopolize++;
-          release(&mmlfq.mlfqlock);
-          goto swtchcontxt;
+          break;
         }
       }
-      release(&ptable.lock);
-    }
-    release(&mmlfq.mlfqlock);
-
-    // Iterate queue L0 ~ L2 to find non-empty queue.
-    level = 0;
-    while(level < 2) {
-      if(isempty(mmlfq.rrlevels, level) != Q_EMPTY) {
-        break;
+    } else {
+      level = 0;
+      while(level < 2 && isempty(mlfq.rrlevels, level) == Q_EMPTY){
+        level++;
       }
-      level++;
+      
+      // queue is fully empty.
+      if(level==2 && mlfq.prlevel.size==0) {
+        release(&ptable.lock);
+        continue;
+      }
+
+      // get proc from mlfq.
+      p = demlfq(&mlfq, level);
     }
 
-    // when all the level of the mlfq is empty
-    // continue the scheduler.
-    if(level == 2 && mmlfq.prlevel.size == 0) {
-      continue;
-    }
-
-    // update p to chosen proc from mlfq.
-    p = demlfq(&mmlfq, level);
-    // cprintf("proc(pid%d, L%d) dequeued(rmt: %d).\n", p->pid, p->mlfq.level, p->mlfq.rmtime);
-    goto swtchcontxt;
-
-  swtchcontxt:
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
-    acquire(&ptable.lock);
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
@@ -516,8 +494,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
-  // cprintf("proc(pid%d, L%d) set to RUNNABLE(rmt: %d).\n", myproc()->pid, myproc()->mlfq.level, myproc()->mlfq.rmtime);
-  enmlfq(&mmlfq, myproc());  // put myproc to mlfq.
+  enmlfq(&mlfq, myproc());
   sched();
   release(&ptable.lock);
 }
@@ -591,9 +568,9 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan) {
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
-      enmlfq(&mmlfq, p);   // put woke-up-process to mlfq.
+      enmlfq(&mlfq, p);
     }
 }
 
@@ -619,8 +596,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        enmlfq(&mlfq, p);
+      }
       release(&ptable.lock);
       return 0;
     }

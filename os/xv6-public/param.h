@@ -12,9 +12,11 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 
-// mlfq.c
-#define NQLEV        2          // number of queue except for last level. (L0, L1 in the case of assignment.)
-#define QSIZE        NPROC+1    // since circular queue needs 1 empty space.
-#define DISABLED     -1          // used to disable [0] element of prioirty queue.
-#define TRUE          1
-#define FALSE         0
+#define QSIZE        65
+#define NQLEV        3
+#define TRUE         1
+#define FALSE        0
+#define DISABLED     0
+#define DISAMONO    -1
+
+#define PASSWORD     2018008104  

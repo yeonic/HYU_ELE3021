@@ -6,8 +6,8 @@
 #define NUM_YIELD 20000
 #define NUM_SLEEP 1000
 
-#define NUM_THREAD 4
-#define MAX_LEVEL 5
+#define NUM_THREAD 1
+#define MAX_LEVEL 3
 
 int parent;
 
@@ -17,7 +17,6 @@ int fork_children()
   for (i = 0; i < NUM_THREAD; i++)
     if ((p = fork()) == 0)
     {
-      printf(1, "getpid: %d\n", getpid());
       sleep(10);
       return getpid();
     }
@@ -37,13 +36,7 @@ int fork_children2()
     }
     else
     {
-      // int r = setPriority(p, i);
-      // if (r < 0)
-      // {
-      //   printf(1, "setPriority returned %d\n", r);
-      //   exit();
-      // }
-      setPriority(p,i);
+      setPriority(p, i);
     }
   }
   return parent;
@@ -84,7 +77,6 @@ int main(int argc, char *argv[])
 
   printf(1, "[Test 1] default\n");
   pid = fork_children();
-  printf(1, "after fork.");
 
   if (pid != parent)
   {

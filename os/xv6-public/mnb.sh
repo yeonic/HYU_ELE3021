@@ -1,4 +1,4 @@
 #!/bin/bash
 
 ./make.sh
-./bootxv6.sh
+./bxv6.sh
