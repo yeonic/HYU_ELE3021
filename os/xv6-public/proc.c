@@ -358,7 +358,7 @@ schedulerLock(int password)
   if(password != 2018008104 ||
      curproc->state != RUNNABLE || mlfq.locked != 1) {
     kill(curproc->pid);
-    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.rmtime, curproc->mlfq.level);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
   }
   mlfq.locked = 1;
@@ -385,7 +385,7 @@ schedulerUnlock(int password)
      curproc->mlfq.monopolize != 1 ||
      curproc->state != RUNNABLE) {
     kill(curproc->pid);
-    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.rmtime, curproc->mlfq.level);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
   }
   mlfq.locked = 0;
@@ -419,19 +419,26 @@ scheduler(void)
     sti();
 
     acquire(&ptable.lock);
-    level = 0;
-    while(level < 2 && isempty(mlfq.rrlevels, level) == Q_EMPTY){
-      level++;
-    }
-    
-    // queue is fully empty.
-    if(level==2 && mlfq.prlevel.size==0) {
-      release(&ptable.lock);
-      continue;
-    }
+    if(mlfq.locked) {
+      for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if(p->state == RUNNABLE && p->mlfq.monopolize>0)
+          p->mlfq.monopolize++;
+      }
+    } else {
+      level = 0;
+      while(level < 2 && isempty(mlfq.rrlevels, level) == Q_EMPTY){
+        level++;
+      }
+      
+      // queue is fully empty.
+      if(level==2 && mlfq.prlevel.size==0) {
+        release(&ptable.lock);
+        continue;
+      }
 
-    // get proc from mlfq.
-    p = demlfq(&mlfq, level);
+      // get proc from mlfq.
+      p = demlfq(&mlfq, level);
+    }
 
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it

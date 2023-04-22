@@ -101,6 +101,11 @@ int main(int argc, char *argv[])
   }
   exit_children();
   printf(1, "[Test 1] finished\n");
+
+  printf(1, "[Test 2] schedulerLock\n");
+  
+  printf(1, "[Test 2] finished\n");
+
   printf(1, "done\n");
   exit();
 }
