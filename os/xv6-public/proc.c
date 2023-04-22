@@ -355,13 +355,16 @@ schedulerLock(int password)
 {
   struct proc* curproc = myproc();
 
-  if(password != 2018008104 ||
-     curproc->state != RUNNABLE || mlfq.locked != 1) {
+  if(password != PASSWORD ||
+     curproc->state != RUNNING ||
+     curproc->mlfq.monopolize != -1 || 
+     mlfq.locked != 0) {
     kill(curproc->pid);
     cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
   }
   mlfq.locked = 1;
+  curproc->mlfq.level = -1;
 
   // set mlfq.monopolize field to 0
   // when mlfq.monopolize goes 100, schedulerUnlock
@@ -380,10 +383,10 @@ schedulerUnlock(int password)
 
   // the process which knows password and monopolizes
   // can run this function
-  if(password != 2018008104 || 
+  if(password != PASSWORD || 
      mlfq.locked != 1 ||
-     curproc->mlfq.monopolize != 1 ||
-     curproc->state != RUNNABLE) {
+     curproc->mlfq.level != -1||
+     curproc->state != RUNNING) {
     kill(curproc->pid);
     cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.elapsed, curproc->mlfq.level);
     return;
@@ -421,8 +424,10 @@ scheduler(void)
     acquire(&ptable.lock);
     if(mlfq.locked) {
       for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        if(p->state == RUNNABLE && p->mlfq.monopolize>0)
+        if(p->state == RUNNABLE && p->mlfq.level == -1) {
           p->mlfq.monopolize++;
+          break;
+        }
       }
     } else {
       level = 0;

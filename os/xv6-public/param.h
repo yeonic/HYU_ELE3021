@@ -17,4 +17,6 @@
 #define TRUE         1
 #define FALSE        0
 #define DISABLED     0
-#define DISAMONO     -1
+#define DISAMONO    -1
+
+#define PASSWORD     2018008104  

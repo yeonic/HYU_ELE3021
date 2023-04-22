@@ -4,9 +4,9 @@
 
 #define NUM_LOOP 100000
 #define NUM_YIELD 20000
-#define NUM_SLEEP 1000ㄴ
+#define NUM_SLEEP 1000
 
-#define NUM_THREAD 4
+#define NUM_THREAD 1
 #define MAX_LEVEL 3
 
 int parent;
@@ -37,11 +37,6 @@ int fork_children2()
     else
     {
       setPriority(p, i);
-      // if (r < 0)
-      // {
-      //   printf(1, "setpriority returned %d\n", r);
-      //   exit();
-      // }
     }
   }
   return parent;
@@ -101,11 +96,6 @@ int main(int argc, char *argv[])
   }
   exit_children();
   printf(1, "[Test 1] finished\n");
-
-  printf(1, "[Test 2] schedulerLock\n");
-  
-  printf(1, "[Test 2] finished\n");
-
   printf(1, "done\n");
   exit();
 }
