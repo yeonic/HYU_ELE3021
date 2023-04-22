@@ -14,6 +14,8 @@ extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 
+extern struct mlfq mlfq;
+
 void
 tvinit(void)
 {
@@ -99,6 +101,11 @@ trap(struct trapframe *tf)
   // until it gets to the regular system call return.)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
+
+  if(ticks == 100 && tf->trapno == T_IRQ0+IRQ_TIMER) {
+    boostmlfq(&mlfq);
+    ticks = 0;
+  }
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.

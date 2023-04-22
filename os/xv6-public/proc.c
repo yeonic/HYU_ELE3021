@@ -358,6 +358,7 @@ schedulerLock(int password)
   if(password != 2018008104 ||
      curproc->state != RUNNABLE || mlfq.locked != 1) {
     kill(curproc->pid);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.rmtime, curproc->mlfq.level);
     return;
   }
   mlfq.locked = 1;
@@ -384,6 +385,7 @@ schedulerUnlock(int password)
      curproc->mlfq.monopolize != 1 ||
      curproc->state != RUNNABLE) {
     kill(curproc->pid);
+    cprintf("pid: %d, time quantum: %d, queue level: %d\n", curproc->pid, curproc->mlfq.rmtime, curproc->mlfq.level);
     return;
   }
   mlfq.locked = 0;
@@ -407,6 +409,7 @@ schedulerUnlock(int password)
 void
 scheduler(void)
 {
+  int level;
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -415,28 +418,35 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    level = 0;
+    while(level < 2 && isempty(mlfq.rrlevels, level) == Q_EMPTY){
+      level++;
     }
-    release(&ptable.lock);
+    
+    // queue is fully empty.
+    if(level==2 && mlfq.prlevel.size==0) {
+      release(&ptable.lock);
+      continue;
+    }
 
+    // get proc from mlfq.
+    p = demlfq(&mlfq, level);
+
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 

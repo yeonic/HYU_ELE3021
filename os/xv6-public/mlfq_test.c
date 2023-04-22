@@ -4,9 +4,9 @@
 
 #define NUM_LOOP 100000
 #define NUM_YIELD 20000
-#define NUM_SLEEP 1000
+#define NUM_SLEEP 1000ㄴ
 
-#define NUM_THREAD 1
+#define NUM_THREAD 4
 #define MAX_LEVEL 3
 
 int parent;

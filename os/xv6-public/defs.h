@@ -211,7 +211,7 @@ void            mlfqinit(struct mlfq*);
 void            updatemlfq(struct mlfq*, struct proc*);
 void            enmlfq(struct mlfq*, struct proc*);
 struct proc*    demlfq(struct mlfq*, int);
-void            boostmlfq(struct mlfq*, uint*);
+void            boostmlfq(struct mlfq*);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

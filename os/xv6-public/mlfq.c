@@ -248,7 +248,7 @@ demlfq(struct mlfq* q, int level)
 
 // should be called only when ticks == 100
 void
-boostmlfq(struct mlfq* q, uint* ticks)
+boostmlfq(struct mlfq* q)
 {
   struct proc* temp;
   // reset ( rmtime ) of proc in L0
@@ -270,7 +270,4 @@ boostmlfq(struct mlfq* q, uint* ticks)
     temp->mlfq.rmtime = 2*(temp->mlfq.level) + 4;
     enprocq(q->rrlevels, 0, temp);
   }
-
-  // reset tick to 0
-  *ticks = 0;
 }
