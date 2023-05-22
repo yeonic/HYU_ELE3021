@@ -395,7 +395,7 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 
 // thread implementation
 pde_t*
-linkuvm(pde_t *pgdir, uint sz)
+linkuvm(pde_t *pgdir, uint sz, uint stacksize)
 {
   pde_t *d;
   pte_t *pte;
@@ -409,6 +409,10 @@ linkuvm(pde_t *pgdir, uint sz)
       panic("linkuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("linkuvm: page not present");
+      
+    // break when we meet guard page
+    if(!(*pte & PTE_U))
+      break;
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
