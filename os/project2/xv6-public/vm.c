@@ -392,3 +392,33 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 //PAGEBREAK!
 // Blank page.
 
+
+// thread implementation
+pde_t*
+linkuvm(pde_t *pgdir, uint sz)
+{
+  pde_t *d;
+  pte_t *pte;
+  uint pa, i, flags;
+  char *mem;
+
+  if((d = setupkvm()) == 0)
+    return 0;
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
+      panic("linkuvm: pte should exist");
+    if(!(*pte & PTE_P))
+      panic("linkuvm: page not present");
+    pa = PTE_ADDR(*pte);
+    flags = PTE_FLAGS(*pte);
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
+      kfree(mem);
+      goto bad;
+    }
+  }
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
+}
