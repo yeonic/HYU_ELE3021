@@ -566,7 +566,6 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
     return -1;
   }
   // Copy process state from proc.
-  cprintf("cursz: %d\n", curproc->sz);
   if((np->pgdir = linkuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
@@ -617,15 +616,10 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   np->tf->eip = (uint)start_routine;
   np->tf->esp = sp;
   np->stacksize = 1;
-  cprintf("[thread%d]eip: %x\n",np->tid, np->tf->eip);
 
-  // switchuvm(np);
   acquire(&ptable.lock);
-
   np->state = RUNNABLE;
-  
   release(&ptable.lock);
-  cprintf("npsz: %d, cursz: %d, stacksize: %d\n", np->sz, curproc->sz, curproc->stacksize);
 
   return 0;
 
