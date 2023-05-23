@@ -121,6 +121,9 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 
+void            freeproc(struct proc*);
+int             thread_create(thread_t*, void *(void*), void *arg);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 
@@ -186,7 +189,7 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
-pde_t*          linkuvm(pde_t*, uint, uint);
+pde_t*          linkuvm(pde_t*, uint);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

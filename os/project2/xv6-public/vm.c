@@ -394,13 +394,15 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 
 
 // thread implementation
+
+// copy page directory of main thread
+// except for PTE of stack
 pde_t*
-linkuvm(pde_t *pgdir, uint sz, uint stacksize)
+linkuvm(pde_t *pgdir, uint sz)
 {
   pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
-  char *mem;
 
   if((d = setupkvm()) == 0)
     return 0;
@@ -409,14 +411,15 @@ linkuvm(pde_t *pgdir, uint sz, uint stacksize)
       panic("linkuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("linkuvm: page not present");
-      
-    // break when we meet guard page
-    if(!(*pte & PTE_U))
-      break;
+    // skip two pages
+    // to avoid copying PTE of stack & guard page
+    if(!(*pte & PTE_U)){
+      i += PGSIZE * 2;
+      continue;
+    }
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
-      kfree(mem);
       goto bad;
     }
   }
@@ -424,5 +427,6 @@ linkuvm(pde_t *pgdir, uint sz, uint stacksize)
 
 bad:
   freevm(d);
+  cprintf("inside bad.\n");
   return 0;
 }

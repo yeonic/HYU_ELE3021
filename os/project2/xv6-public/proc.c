@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->mlimit = 0;
 
   release(&ptable.lock);
 
@@ -531,4 +532,104 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+
+// thread implementation
+void 
+freeproc(struct proc *p) 
+{
+  acquire(&ptable.lock);
+  kfree(p->kstack);
+  p->kstack = 0;
+  freevm(p->pgdir);
+  p->pid = 0;
+  p->parent = 0;
+  p->tmain = 0;
+  p->name[0] = 0;
+  p->killed = 0;
+  p->state = UNUSED;
+  release(&ptable.lock);
+}
+
+int
+thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
+{
+  int i;
+  uint sz, sp, ustack[2];
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Part1: clone current process.
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+  // Copy process state from proc.
+  cprintf("cursz: %d\n", curproc->sz);
+  if((np->pgdir = linkuvm(curproc->pgdir, curproc->sz)) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+  // for stack page is not copied, size decreased.
+  np->sz = curproc->sz - (curproc->stacksize * PGSIZE * 2);
+
+  // set main thread, then set thread id
+  acquire(&ptable.lock);
+  np->tmain = curproc;
+  np->tid = np->tmain->tcount++;
+  np->pid = np->tmain->pid;
+  release(&ptable.lock);
+  
+  // compensate pid count
+  nextpid--;
+  *thread = np->tid;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  // Part2: execute thread created.
+  // Allocate two pages at the next page boundary.
+  // Make the first inaccessible.  Use the second as the user stack.
+  sz = PGROUNDUP(np->sz);
+  if((sz = allocuvm(np->pgdir, sz, sz + 2*PGSIZE)) == 0)
+    goto bad;
+  clearpteu(np->pgdir, (char*)(sz - 2*PGSIZE));
+  sp = sz;
+
+  ustack[0] = 0xffffffff;
+  ustack[1] = (uint)arg;
+  sp -= 8;
+  if(copyout(np->pgdir, sp, ustack, 8) < 0)
+    goto bad;
+
+  // Commit to the user image.
+  np->sz = sz;
+  np->tf->eip = (uint)start_routine;
+  np->tf->esp = sp;
+  np->stacksize = 1;
+  cprintf("[thread%d]eip: %x\n",np->tid, np->tf->eip);
+
+  // switchuvm(np);
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+  
+  release(&ptable.lock);
+  cprintf("npsz: %d, cursz: %d, stacksize: %d\n", np->sz, curproc->sz, curproc->stacksize);
+
+  return 0;
+
+  bad:
+    freeproc(np);
+    return -1;
 }

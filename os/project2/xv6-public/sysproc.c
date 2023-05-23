@@ -89,3 +89,14 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// threads
+int 
+sys_thread_create(void) 
+{
+  int thread, start_routine, arg;
+  if(argint(0, &thread) < 0 || 
+     argint(0, &start_routine) < 0 || argint(0, &arg) < 0) 
+     return -1;
+  return thread_create((thread_t*)thread, (void*)start_routine, (void*)arg);   
+}
