@@ -100,3 +100,22 @@ sys_thread_create(void)
      return -1;
   return thread_create((thread_t*)thread, (void*(*)(void*))start_routine, (void*)arg);   
 }
+
+int
+sys_thread_exit(void)
+{
+  int retval;
+  if(argint(0, &retval) < 0)
+    return -1;
+  thread_exit((void*)retval);
+  return 0;
+}
+
+int
+sys_thread_join(void)
+{
+  int thread, retval;
+  if(argint(0, &thread) < 0 || argint(1, &retval) < 0)
+    return -1;
+  return thread_join((thread_t)thread, (void**)retval);
+}

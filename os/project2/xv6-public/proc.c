@@ -241,10 +241,14 @@ exit(void)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == curproc->pid && p != curproc){
       freethread(p);
-      clearofile(p);
     }
   }
   release(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == curproc->pid && p != curproc && p->state != ZOMBIE){
+      clearofile(p);
+    }
+  }
 
   // Kill curr thread
   // Close all open files.
@@ -286,6 +290,7 @@ wait(void)
       if(p->parent != curproc)
         continue;
       havekids = 1;
+
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
@@ -301,15 +306,16 @@ wait(void)
         return pid;
       }
     }
-
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
 
+    cprintf("before sleep\n");
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    cprintf("after sleep\n");
   }
 }
 
@@ -687,3 +693,37 @@ thread_exit(void* retval)
   panic("zombie thread exit.");
 }
 
+int
+thread_join(thread_t thread, void **retval) 
+{
+  struct proc *p;
+  int havekids;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->tmain != curproc || p->tid != thread)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        *retval = p->tretval;
+        freethread(p);
+        release(&ptable.lock);
+        return 0;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
