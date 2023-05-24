@@ -241,15 +241,10 @@ exit(void)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == curproc->pid && p != curproc){
       freethread(p);
-    }
-  }
-  release(&ptable.lock);
-
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == curproc->pid && p != curproc && p->state != ZOMBIE){
       clearofile(p);
     }
   }
+  release(&ptable.lock);
 
   // Kill curr thread
   // Close all open files.
@@ -657,3 +652,38 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
     release(&ptable.lock);
     return -1;
 }
+
+
+void
+thread_exit(void* retval)
+{
+  struct proc *curproc = myproc();
+  struct proc *p;
+
+  // if current thread is main thread
+  // kill all threads except for curproc
+  if(curproc->tid == TMAINID) {
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == curproc->pid && p != curproc){
+        freethread(p);
+        clearofile(p);
+      }
+    }
+    release(&ptable.lock);
+  }
+
+  curproc->tretval = retval;
+  // close all open files.
+  clearofile(curproc);
+
+  acquire(&ptable.lock);
+  // Parent might be sleeping in wait().
+  wakeup1(curproc->parent);
+  
+  // Jump into the scheduler, never to return.
+  curproc->state = ZOMBIE;
+  sched();
+  panic("zombie thread exit.");
+}
+

@@ -124,6 +124,7 @@ void            yield(void);
 void            freethread(struct proc*);
 void            clearofile(struct proc*);
 int             thread_create(thread_t*, void *(void*), void *arg);
+void            thread_exit(void* retval);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
