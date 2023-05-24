@@ -22,7 +22,7 @@ void *thread_main(void *arg)
   return 0;
 }
 
-uint thread[NUM_THREAD];
+int thread[NUM_THREAD];
 
 int main(int argc, char *argv[])
 {

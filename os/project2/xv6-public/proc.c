@@ -88,7 +88,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tid = TMAINID;
   p->mlimit = 0;
+  p->tmain = p;
 
   release(&ptable.lock);
 
@@ -230,26 +232,30 @@ exit(void)
 {
   struct proc *curproc = myproc();
   struct proc *p;
-  int fd;
 
   if(curproc == initproc)
     panic("init exiting");
 
-  // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
+  // Kill all threads except for curproc
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == curproc->pid && p != curproc){
+      freethread(p);
+    }
+  }
+  release(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == curproc->pid && p != curproc && p->state != ZOMBIE){
+      clearofile(p);
     }
   }
 
-  begin_op();
-  iput(curproc->cwd);
-  end_op();
-  curproc->cwd = 0;
+  // Kill curr thread
+  // Close all open files.
+  clearofile(curproc);
 
   acquire(&ptable.lock);
-
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
@@ -536,20 +542,41 @@ procdump(void)
 
 
 // thread implementation
+// free thread
+// must be called when ptable.lock is held
 void 
-freeproc(struct proc *p) 
+freethread(struct proc *p) 
 {
-  acquire(&ptable.lock);
   kfree(p->kstack);
   p->kstack = 0;
-  freevm(p->pgdir);
-  p->pid = 0;
+  deallocuvm(p->pgdir, KERNBASE, 0);
   p->parent = 0;
   p->tmain = 0;
   p->name[0] = 0;
   p->killed = 0;
   p->state = UNUSED;
-  release(&ptable.lock);
+}
+
+void
+clearofile(struct proc* p) 
+{
+  for(int fd = 0; fd < NOFILE; fd++) {
+    if(p->ofile[fd]) {
+      // if it is main thread, close actual file
+      if(p->tid == TMAINID) {
+        fileclose(p->ofile[fd]);
+      }
+      // it it is not, just map null pointer
+      p->ofile[fd] = 0;
+    }
+  }
+  // drop cwd
+  if(p->tid == TMAINID) {
+    begin_op();
+    iput(p->cwd);
+    end_op();
+  }
+  p->cwd = 0;
 }
 
 int
@@ -580,6 +607,7 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   np->tmain = curproc;
   np->tid = np->tmain->tcount++;
   np->pid = np->tmain->pid;
+  np->parent = np->tmain->parent;
   release(&ptable.lock);
   
   // compensate pid count
@@ -624,6 +652,8 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   return 0;
 
   bad:
-    freeproc(np);
+    acquire(&ptable.lock);
+    freethread(np);
+    release(&ptable.lock);
     return -1;
 }

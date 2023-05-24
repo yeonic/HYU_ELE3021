@@ -121,7 +121,8 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 
-void            freeproc(struct proc*);
+void            freethread(struct proc*);
+void            clearofile(struct proc*);
 int             thread_create(thread_t*, void *(void*), void *arg);
 
 // swtch.S
