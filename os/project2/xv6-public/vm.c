@@ -427,6 +427,5 @@ linkuvm(pde_t *pgdir, uint sz)
 
 bad:
   freevm(d);
-  cprintf("inside bad.\n");
   return 0;
 }

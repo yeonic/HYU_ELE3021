@@ -554,15 +554,17 @@ procdump(void)
 void 
 freethread(struct proc *p) 
 {
-  if(p->tid == TMAINID)
+  if(p->tid == TMAINID){
     kfree(p->kstack);
+  }
   p->kstack = 0;
+  p->pgdir = 0;
   p->parent = 0;
   p->tmain = 0;
   p->name[0] = 0;
   p->killed = 0;
   p->state = UNUSED;
-  p->pgdir = 0;
+
 }
 
 void
