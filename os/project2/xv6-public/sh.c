@@ -345,7 +345,6 @@ struct cmd*
 parseline(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parsepipe(ps, es);
   while(peek(ps, es, "&")){
     gettoken(ps, es, 0, 0);
@@ -362,7 +361,6 @@ struct cmd*
 parsepipe(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parseexec(ps, es);
   if(peek(ps, es, "|")){
     gettoken(ps, es, 0, 0);
@@ -422,7 +420,6 @@ parseexec(char **ps, char *es)
 
   if(peek(ps, es, "("))
     return parseblock(ps, es);
-
   ret = execcmd();
   cmd = (struct execcmd*)ret;
 

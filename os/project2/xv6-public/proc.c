@@ -88,9 +88,14 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->tid = TMAINID;
+  
   p->mlimit = 0;
+  p->stacksize = 0;
+
+  p->tid = TMAINID;
+  p->tcount = 0;
   p->tmain = p;
+  p->tretval = 0;
 
   release(&ptable.lock);
 
@@ -244,7 +249,7 @@ exit(void)
     }
   }
   release(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == curproc->pid && p != curproc && p->state != ZOMBIE){
       clearofile(p);
     }
@@ -312,10 +317,8 @@ wait(void)
       return -1;
     }
 
-    cprintf("before sleep\n");
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
-    cprintf("after sleep\n");
   }
 }
 
@@ -548,14 +551,15 @@ procdump(void)
 void 
 freethread(struct proc *p) 
 {
-  kfree(p->kstack);
+  if(p->tid == TMAINID)
+    kfree(p->kstack);
   p->kstack = 0;
-  deallocuvm(p->pgdir, KERNBASE, 0);
   p->parent = 0;
   p->tmain = 0;
   p->name[0] = 0;
   p->killed = 0;
   p->state = UNUSED;
+  p->pgdir = 0;
 }
 
 void
@@ -610,7 +614,7 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   np->pid = np->tmain->pid;
   np->parent = np->tmain->parent;
   release(&ptable.lock);
-  
+
   // compensate pid count
   nextpid--;
   *thread = np->tid;
@@ -673,19 +677,26 @@ thread_exit(void* retval)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->pid == curproc->pid && p != curproc){
         freethread(p);
-        clearofile(p);
       }
     }
     release(&ptable.lock);
-  }
 
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == curproc->pid && p != curproc && p->state != ZOMBIE){
+        clearofile(p);
+      }
+    }
+  }
   curproc->tretval = retval;
   // close all open files.
   clearofile(curproc);
 
   acquire(&ptable.lock);
   // Parent might be sleeping in wait().
-  wakeup1(curproc->parent);
+  if(curproc->tid == TMAINID) 
+    wakeup1(curproc->parent);
+  else
+    wakeup1(curproc->tmain);
   
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
