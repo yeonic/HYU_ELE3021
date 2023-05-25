@@ -204,8 +204,11 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+
+  acquire(&ptable.lock);
   np->sz = curproc->sz;
   np->parent = curproc;
+  release(&ptable.lock);
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -615,8 +618,6 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   np->parent = np->tmain->parent;
   release(&ptable.lock);
 
-  // compensate pid count
-  nextpid--;
   *thread = np->tid;
   *np->tf = *curproc->tf;
 
