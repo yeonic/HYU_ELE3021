@@ -90,7 +90,7 @@ found:
   p->pid = nextpid++;
   
   p->mlimit = 0;
-  p->stacksize = 0;
+  p->stacksize = 1;
 
   p->tid = TMAINID;
   p->tcount = 0;
@@ -168,7 +168,6 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
-
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -549,14 +548,14 @@ procdump(void)
 
 
 // thread implementation
+
 // free thread
 // must be called when ptable.lock is held
 void 
 freethread(struct proc *p) 
 {
-  if(p->tid == TMAINID){
+  if(p->kstack != 0)
     kfree(p->kstack);
-  }
   p->kstack = 0;
   p->pgdir = 0;
   p->parent = 0;
@@ -602,6 +601,8 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   if((np = allocproc()) == 0){
     return -1;
   }
+
+  acquire(&ptable.lock);
   // Copy process state from proc.
   if((np->pgdir = linkuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
@@ -609,8 +610,10 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
     np->state = UNUSED;
     return -1;
   }
+
   // for stack page is not copied, size decreased.
   np->sz = curproc->sz - (curproc->stacksize * PGSIZE * 2);
+  release(&ptable.lock);
 
   // set main thread, then set thread id
   acquire(&ptable.lock);
@@ -619,6 +622,7 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   np->pid = np->tmain->pid;
   np->parent = np->tmain->parent;
   release(&ptable.lock);
+
 
   *thread = np->tid;
   *np->tf = *curproc->tf;
@@ -634,7 +638,7 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
 
   // Part2: execute thread created.
   // Allocate two pages at the next page boundary.
-  // Make the first inaccessible.  Use the second as the user stack.
+  // Make the first as block page.  Use the second as the user stack.
   sz = PGROUNDUP(np->sz);
   if((sz = allocuvm(np->pgdir, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
@@ -647,13 +651,12 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   if(copyout(np->pgdir, sp, ustack, 8) < 0)
     goto bad;
 
+  acquire(&ptable.lock);
   // Commit to the user image.
   np->sz = sz;
   np->tf->eip = (uint)start_routine;
   np->tf->esp = sp;
-  np->stacksize = 1;
-
-  acquire(&ptable.lock);
+  np->stacksize = curproc->stacksize;
   np->state = RUNNABLE;
   release(&ptable.lock);
 

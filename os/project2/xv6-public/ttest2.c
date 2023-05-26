@@ -69,7 +69,7 @@ void *thread_sbrk(void *arg)
 
   if (val == 0) {
     ptr = (int *)malloc(65536);
-    sleep(100);
+    sleep(50);
     free(ptr);
     ptr = 0;
   }
@@ -131,16 +131,16 @@ int main(int argc, char *argv[])
   for (i = 0; i < NUM_THREAD; i++)
     expected[i] = i;
 
-  // printf(1, "Test 1: Basic test\n");
-  // create_all(2, thread_basic);
-  // sleep(100);
-  // printf(1, "Parent waiting for children...\n");
-  // join_all(2);
-  // if (status != 1) {
-  //   printf(1, "Join returned before thread exit, or the address space is not properly shared\n");
-  //   failed();
-  // }
-  // printf(1, "Test 1 passed\n\n");
+  printf(1, "Test 1: Basic test\n");
+  create_all(2, thread_basic);
+  sleep(100);
+  printf(1, "Parent waiting for children...\n");
+  join_all(2);
+  if (status != 1) {
+    printf(1, "Join returned before thread exit, or the address space is not properly shared\n");
+    failed();
+  }
+  printf(1, "Test 1 passed\n\n");
 
   printf(1, "Test 2: Fork test\n");
   create_all(NUM_THREAD, thread_fork);

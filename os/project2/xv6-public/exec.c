@@ -11,7 +11,7 @@ int
 exec(char *path, char **argv)
 {
   char *s, *last;
-  int i, off;
+  int i, off, mstacksize;
   uint argc, sz, sp, ustack[3+MAXARG+1];
   struct elfhdr elf;
   struct inode *ip;
@@ -60,12 +60,16 @@ exec(char *path, char **argv)
   end_op();
   ip = 0;
 
-  // Allocate two pages at the next page boundary.
-  // Make the first inaccessible.  Use the second as the user stack.
+  mstacksize = curproc->tmain->stacksize;
+
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
-    goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  for(int i=0; i<mstacksize; i++) {
+    // Allocate two pages at the next page boundary.
+    // Make the first inaccessible.  Use the second as the user stack.
+    if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+      goto bad;
+    clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  }
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -100,7 +104,7 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->stacksize = 1;
+  curproc->stacksize = mstacksize;
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;

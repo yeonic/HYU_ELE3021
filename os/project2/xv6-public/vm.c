@@ -414,8 +414,7 @@ linkuvm(pde_t *pgdir, uint sz)
     // skip two pages
     // to avoid copying PTE of stack & guard page
     if(!(*pte & PTE_U)){
-      i += PGSIZE * 2;
-      continue;
+      break;
     }
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
