@@ -82,8 +82,9 @@ malloc(uint nbytes)
       freep = prevp;
       return (void*)(p + 1);
     }
-    if(p == freep)
+    if(p == freep){
       if((p = morecore(nunits)) == 0)
         return 0;
+    }
   }
 }

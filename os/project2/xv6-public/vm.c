@@ -413,9 +413,8 @@ linkuvm(pde_t *pgdir, uint sz)
       panic("linkuvm: page not present");
     // skip two pages
     // to avoid copying PTE of stack & guard page
-    if(!(*pte & PTE_U)){
+    if(!(*pte & PTE_U))
       break;
-    }
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
@@ -427,4 +426,47 @@ linkuvm(pde_t *pgdir, uint sz)
 bad:
   freevm(d);
   return 0;
+}
+
+// map newly grown part of mainthread
+// return 0 if something gone wrong
+// return d if mapped successfully.
+void
+growuvm(pde_t* srcdir, pde_t* dstdir, uint oldsz, uint newsz)
+{
+  pte_t *pte;
+  uint pa, i, flags;
+  pde_t temp = *dstdir;
+
+  if(oldsz == newsz)
+    return;
+
+  if(oldsz < newsz) {
+    for(i = PGROUNDUP(oldsz); i < newsz; i += PGSIZE){
+      if((pte = walkpgdir(srcdir, (void *) i, 0)) == 0)
+        panic("growuvm: pte should exist");
+      if(!(*pte & PTE_P))
+        panic("growuvm: page already present");
+
+      pa = PTE_ADDR(*pte);
+      flags = PTE_FLAGS(*pte);
+      if(mappages(dstdir, (void*)i, PGSIZE, pa, flags) < 0) {
+        *dstdir = temp;
+        return;
+      }
+    }
+  }
+  else if(oldsz > newsz) {
+    for(i = PGROUNDUP(newsz); i < oldsz; i += PGSIZE ){
+      if((pte = walkpgdir(srcdir, (void *) i, 0)) == 0)
+        panic("growuvm: pte should exist");
+      if(!(*pte & PTE_P))
+        panic("growuvm: page not present");
+      pa = PTE_ADDR(*pte);
+      if(mappages(dstdir, (void*)i, PGSIZE, pa, ~PTE_P) < 0) {
+        *dstdir = temp;
+        return;
+      } 
+    }
+  }
 }
