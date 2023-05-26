@@ -757,3 +757,26 @@ thread_join(thread_t thread, void **retval)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }
+
+// pmanager
+int
+setmemorylimit(int pid, int limit)
+{
+  struct proc* p;
+
+  if(limit < 0) 
+    return -1;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid) 
+      if(p->mlimit > limit) {
+        release(&ptable.lock);      
+        return -1;
+      }
+      p->mlimit = limit;
+  }
+  release(&ptable.lock);
+
+  return 0;
+}

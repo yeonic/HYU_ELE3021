@@ -128,6 +128,8 @@ int             thread_create(thread_t*, void *(void*), void *arg);
 void            thread_exit(void* retval);
 int             thread_join(thread_t, void**);
 
+int             setmemorylimit(int, int);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 
