@@ -123,7 +123,7 @@ int
 exec2(char *path, char **argv, int stacksize)
 {
   char *s, *last;
-  int i, off, mstacksize;
+  int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
   struct elfhdr elf;
   struct inode *ip;
@@ -133,7 +133,7 @@ exec2(char *path, char **argv, int stacksize)
 
 
   // guard prevents wrong stacksize.
-  if(stacksize < 1 || stacksize > 100)
+  if(stacksize < 0 || stacksize > 100)
     return -1;
 
   begin_op();
@@ -178,14 +178,16 @@ exec2(char *path, char **argv, int stacksize)
   ip = 0;
 
   sz = PGROUNDUP(sz);
+  if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
+    goto bad;
+  clearpteu(pgdir, (char*)(sz - PGSIZE * stacksize));
+
   for(int i=0; i < stacksize+1; i++) {
     // Allocate two pages at the next page boundary.
     // Make the first inaccessible.  Use the second as the user stack.
     if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
       goto bad;
   }
-  clearpteu(pgdir, (char*)(sz - PGSIZE * stacksize));
-  curproc->stacksize = stacksize;
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -219,6 +221,8 @@ exec2(char *path, char **argv, int stacksize)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+  
+  curproc->stacksize = stacksize;
   curproc->mlimit = 0;
 
   switchuvm(curproc);

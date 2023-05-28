@@ -559,6 +559,31 @@ procdump(void)
   }
 }
 
+void
+printplist(void)
+{
+  struct proc *p, *th;
+  int stacksize;
+  uint sz;
+
+  cprintf("( NAME, PID, STACKSIZE, MEMSIZE, MEMLIMIT )\n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    // early continue
+    if(p->state == UNUSED || p->state == ZOMBIE || p->killed == 1 || p->tid != TMAINID) 
+      continue;
+    stacksize = p->stacksize;
+    sz = p->sz;
+
+    for(th = ptable.proc; th < &ptable.proc[NPROC]; th++)
+      if(p->pid == th->pid && p->tid != th->tid) {
+        stacksize += th->stacksize;
+        sz += stacksize * 2;
+      }
+
+    cprintf("( %s, %d, %d, %d, %d )\n", p->name, p->pid, stacksize, sz, p->mlimit);
+  }
+}
+
 
 // thread implementation
 
@@ -763,18 +788,18 @@ int
 setmemorylimit(int pid, int limit)
 {
   struct proc* p;
-
   if(limit < 0) 
     return -1;
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == pid) 
+    if(p->pid == pid && p->tid == TMAINID) {
       if(p->mlimit > limit) {
         release(&ptable.lock);      
         return -1;
       }
       p->mlimit = limit;
+    }
   }
   release(&ptable.lock);
 

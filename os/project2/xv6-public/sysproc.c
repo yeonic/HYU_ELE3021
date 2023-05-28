@@ -119,3 +119,21 @@ sys_thread_join(void)
     return -1;
   return thread_join((thread_t)thread, (void**)retval);
 }
+
+int
+sys_setmemorylimit(void)
+{
+  int pid, limit;
+  if(argint(0, &pid) < 0 || argint(1, &limit) < 0)
+    return -1;
+  if(limit < 0)
+    return -1;
+  return setmemorylimit(pid, limit);
+}
+
+int
+sys_printplist(void)
+{
+  printplist();
+  return 0;
+}
