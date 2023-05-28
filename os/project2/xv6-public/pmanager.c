@@ -48,7 +48,6 @@ main()
             path[pathidx++] = buf[idx++];
          }
          path[pathidx] = '\0';
-         printf(2, "path: %s\n", path);
 
          if(buf[idx++] == '\n') {
             printf(2, "pmanager: stacksize required.\n");

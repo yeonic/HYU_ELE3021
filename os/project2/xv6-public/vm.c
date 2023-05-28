@@ -411,8 +411,7 @@ linkuvm(pde_t *pgdir, uint sz)
       panic("linkuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("linkuvm: page not present");
-    // skip two pages
-    // to avoid copying PTE of stack & guard page
+      
     if(!(*pte & PTE_U))
       break;
     pa = PTE_ADDR(*pte);

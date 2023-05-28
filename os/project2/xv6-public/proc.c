@@ -650,7 +650,7 @@ thread_create(thread_t *thread, void *(*start_routine)(void*), void *arg)
   }
 
   // for stack page is not copied, size decreased.
-  np->sz = curproc->sz - (curproc->stacksize * PGSIZE * 2);
+  np->sz = curproc->sz - (curproc->stacksize * PGSIZE + 1);
   release(&ptable.lock);
 
   // set main thread, then set thread id

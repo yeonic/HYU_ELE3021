@@ -172,10 +172,7 @@ exec2(char *path, char **argv, int stacksize)
   ip = 0;
 
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
-    goto bad;
-
-  for(int i=0; i < stacksize; i++) {
+  for(int i=0; i < stacksize+1; i++) {
     // Allocate two pages at the next page boundary.
     // Make the first inaccessible.  Use the second as the user stack.
     if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
