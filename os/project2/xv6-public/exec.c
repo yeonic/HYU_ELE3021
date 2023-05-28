@@ -11,7 +11,7 @@ int
 exec(char *path, char **argv)
 {
   char *s, *last;
-  int i, off, mstacksize;
+  int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
   struct elfhdr elf;
   struct inode *ip;
@@ -60,16 +60,12 @@ exec(char *path, char **argv)
   end_op();
   ip = 0;
 
-  mstacksize = curproc->tmain->stacksize;
-
+  // Allocate two pages at the next page boundary.
+  // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  for(int i=0; i<mstacksize; i++) {
-    // Allocate two pages at the next page boundary.
-    // Make the first inaccessible.  Use the second as the user stack.
-    if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
       goto bad;
-    clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-  }
+  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -104,7 +100,6 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
 
-  curproc->stacksize = mstacksize;
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;
@@ -130,7 +125,6 @@ exec2(char *path, char **argv, int stacksize)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
-
 
   // guard prevents wrong stacksize.
   if(stacksize < 0 || stacksize > 100)
@@ -180,14 +174,14 @@ exec2(char *path, char **argv, int stacksize)
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
     goto bad;
-  clearpteu(pgdir, (char*)(sz - PGSIZE * stacksize));
 
-  for(int i=0; i < stacksize+1; i++) {
+  for(int i=0; i < stacksize; i++) {
     // Allocate two pages at the next page boundary.
     // Make the first inaccessible.  Use the second as the user stack.
     if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) == 0)
       goto bad;
   }
+  clearpteu(pgdir, (char*)(sz - PGSIZE * stacksize));
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -230,6 +224,7 @@ exec2(char *path, char **argv, int stacksize)
   return 0;
 
  bad:
+  cprintf("inside bad\n");
   if(pgdir)
     freevm(pgdir);
   if(ip){

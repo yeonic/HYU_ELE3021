@@ -61,8 +61,10 @@ main()
          pid = fork();
          if(pid == 0) {
             char* argv[] = {path, 0};
-            // exec(argv[0], argv);
-            exec2(argv[0], argv, stacksize);
+            if(stacksize == 1)
+               exec(argv[0], argv);
+            else
+               exec2(argv[0], argv, stacksize);
             printf(2, "pmanager: failed to exec.\n", stacksize);
          } else if(pid > 0) {
             wait();
