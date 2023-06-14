@@ -12,3 +12,4 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       300000  // size of file system in blocks
 
+#define MAXPATH      4096    // maximum length of the path

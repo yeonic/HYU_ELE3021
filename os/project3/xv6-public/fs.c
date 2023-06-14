@@ -607,7 +607,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
-
+  
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
       return -1;
@@ -618,7 +618,6 @@ writei(struct inode *ip, char *src, uint off, uint n)
     return -1;
   if(off + n > MAXFILE*BSIZE)
     return -1;
-
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);

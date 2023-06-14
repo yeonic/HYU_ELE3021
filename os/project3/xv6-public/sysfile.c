@@ -283,10 +283,39 @@ create(char *path, short type, short major, short minor)
 }
 
 int
+sys_symlink(void)
+{
+  char *old, *new;
+  struct inode* ip;
+
+  if(argstr(0, &old) < 0 || argstr(1, &new) < 0)
+    return -1;
+  
+  begin_op();
+
+  // create new inode
+  if((ip = create(new, T_SLNK, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+  int oldlen = strlen(old);
+  int isize = sizeof(int);
+  if(writei(ip, (char*)&oldlen, 0, isize) != isize || 
+     writei(ip, old, isize, oldlen+1) != (oldlen+1)) {
+    end_op();
+    return -1;
+  }
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
+
+int
 sys_open(void)
 {
-  char *path;
-  int fd, omode;
+  char *path, *oldpath;
+  int fd, omode, depth;
   struct file *f;
   struct inode *ip;
 
@@ -312,6 +341,26 @@ sys_open(void)
       end_op();
       return -1;
     }
+  }
+
+  depth = 0;
+  oldpath = 0;
+  int oldlen = 0;
+  int isize = sizeof(int);
+  // omode for "ls" supoort
+  while(ip->type == T_SLNK && omode) {
+    if(readi(ip, (char*)&oldlen, 0, isize) != isize || 
+       readi(ip, oldpath, isize, oldlen+1) != oldlen+1) {
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    iunlockput(ip);
+    if((ip = namei(oldpath)) == 0 || ++depth > 5) {
+      end_op();
+      return -1;
+    }
+    ilock(ip);
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
