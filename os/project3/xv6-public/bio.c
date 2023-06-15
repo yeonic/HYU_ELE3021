@@ -142,3 +142,20 @@ brelse(struct buf *b)
 //PAGEBREAK!
 // Blank page.
 
+// check bcache is available.
+// if there are less then 5 free space, return 0
+// return 1 for the other case.
+int
+bavail(void)
+{
+  struct buf *b;
+  int freespace = 0;
+
+  acquire(&bcache.lock);
+  for(b = bcache.head.next; b != &bcache.head; b = b->next)
+    if((b->flags & B_DIRTY) == 0)
+      freespace++;
+  release(&bcache.lock);
+
+  return freespace <= 9 ? 0 : 1;
+}

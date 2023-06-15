@@ -164,6 +164,12 @@ bad:
   return -1;
 }
 
+int
+sys_sync(void) 
+{
+  return sync();
+}
+
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)

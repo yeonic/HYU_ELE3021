@@ -151,7 +151,7 @@ end_op(void)
   log.outstanding -= 1;
   if(log.committing)
     panic("log.committing");
-  if(log.outstanding == 0){
+  if(!bavail()){
     do_commit = 1;
     log.committing = 1;
   } else {
@@ -163,14 +163,28 @@ end_op(void)
   release(&log.lock);
 
   if(do_commit){
-    // call commit w/o holding locks, since not allowed
-    // to sleep with locks.
-    commit();
-    acquire(&log.lock);
-    log.committing = 0;
-    wakeup(&log);
-    release(&log.lock);
+    sync();
+    // cprintf("buffer flushed(%d)\n", nblock);
   }
+}
+
+int
+sync(void)
+{
+  acquire(&log.lock);
+  int nblock = log.lh.n;
+  release(&log.lock);
+
+  if(nblock < 1)
+    return -1;
+
+  commit();
+  acquire(&log.lock);
+  log.committing = 0;
+  wakeup(&log);
+  release(&log.lock);
+
+  return nblock;
 }
 
 // Copy modified blocks from cache to log.
